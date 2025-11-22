@@ -25,6 +25,16 @@ build/
 .vite/
 *.local
 
+# Capacitor / Native builds
+android/
+ios/
+.capacitor/
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
+*.certSigningRequest
+
 # Environment variables
 .env
 .env.local
