@@ -25,39 +25,34 @@ import {
 
 export function DashboardScreen({ user, goals, habits, onNavigate }) {
   const currentGoal = goals[0]; // Assuming first goal is primary
-  const todaysTasks = [
-    {
-      id: 1,
-      title: "Review programming fundamentals",
-      completed: false,
-      time: "30 min",
-      priority: "high",
-    },
-    {
-      id: 2,
-      title: "Complete online course module",
-      completed: true,
-      time: "45 min",
-      priority: "medium",
-    },
-    {
-      id: 3,
-      title: "Practice coding problem",
-      completed: false,
-      time: "20 min",
-      priority: "high",
-    },
-    {
-      id: 4,
-      title: "Read industry blog post",
-      completed: false,
-      time: "15 min",
-      priority: "low",
-    },
-  ];
+//   This allows ML/AI algorithms to store extra metadata for each task.
+ const todaysTasks = [
+   {
+     id: 1,
+     title: "Review programming fundamentals",
+     completed: false,
+     time: "30 min",
+     priority: "high",
+     category: "learning",      // AI category
+     recommendedTime: "morning", // AI suggested time
+     moodImpact: 0.2,          // How it affects mood
+     importanceScore: 0.9,     // AI predicted importance
+   },
+
+ ];
+
 
   const completedTasks = todaysTasks.filter((task) => task.completed).length;
   const progress = Math.round((completedTasks / todaysTasks.length) * 100);
+  const today = new Date().toISOString().split("T")[0];
+ const rescheduledTasks = [
+   {
+     id: 2,
+     title: "Complete AI assignment",
+     completed: false,
+     dueDate: today,
+   }
+ ];
 
   const getPriorityColor = (priority) => {
     switch (priority) {
@@ -66,9 +61,9 @@ export function DashboardScreen({ user, goals, habits, onNavigate }) {
       case "medium":
         return "from-blue-500 to-blue-600";
       case "low":
-        return "from-ash-400 to-ash-500";
+        return "from-ash-400 to-gray-500";
       default:
-        return "from-ash-400 to-ash-500";
+        return "from-ash-400 to-gray-500";
     }
   };
 
@@ -135,92 +130,96 @@ export function DashboardScreen({ user, goals, habits, onNavigate }) {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                <h3 className="font-medium text-ash-800">
-                  {currentGoal.title}
-                </h3>
-                <p className="text-sm text-ash-600 line-clamp-2">
-                  {currentGoal.description}
-                </p>
-                <div className="flex items-center justify-between">
-                  <Badge
-                    variant="outline"
-                    className="border-blue-300 text-blue-700 bg-blue-50"
-                  >
-                    {currentGoal.category}
-                  </Badge>
-                  <span className="text-sm text-ash-500">
-                    {currentGoal.timeframe}
-                  </span>
-                </div>
+                <h3 className="font-medium text-ash-800">{currentGoal.title}</h3>
+                <p className="text-sm text-ash-600 line-clamp-2">{currentGoal.description}</p>
+                {currentGoal.milestones?.map(m => (
+                  <div key={m.id} className="flex items-center justify-between">
+                    <p className={`text-sm ${m.completed ? "line-through text-ash-500" : "text-ash-700"}`}>{m.title}</p>
+                    <Badge className={m.completed ? "bg-green-500 text-white" : "bg-ash-100 text-ash-700"}>
+                      {m.completed ? "Done" : "Pending"}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        {rescheduledTasks.length > 0 && (
+          <Card className="glass-card border-blue-200 bg-blue-50 shadow-card">
+            <CardHeader>
+              <div className="flex items-center space-x-2">
+                <Clock className="size-5 text-blue-600" />
+                <CardTitle className="text-lg text-gradient">
+                  AI Rescheduled Tasks
+                </CardTitle>
+              </div>
+              <p className="text-sm text-600">
+                I rescheduled {rescheduledTasks.length} task(s) to help you stay on track 🔁
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {rescheduledTasks.map(task => (
+                  <div key={task.id} className="glass-card p-3 rounded-xl flex justify-between items-center shadow-sm">
+                    <div>
+                      <p className="font-medium text-ash-800">{task.title}</p>
+                      <p className="text-xs text-blue-600 mt-1">Rescheduled by AI</p>
+                    </div>
+                    <Button size="sm" className="rounded-full bg-blue-500 text-white">
+                      ✓
+                    </Button>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Today's Tasks */}
-        <Card className="glass-card border-0 shadow-card border-ash-200">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Calendar className="size-5 text-blue-600" />
-                <CardTitle className="text-lg text-gradient">
-                  Today's Tasks
-                </CardTitle>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-blue-600 hover:bg-blue-50"
-              >
-                <Plus className="size-4" />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {todaysTasks.map((task) => (
-                <div
-                  key={task.id}
-                  className="glass-card p-3 rounded-xl border-0 hover:shadow-glow transition-all duration-200 border-ash-100"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div
-                      className={`size-5 rounded-full border-2 flex items-center justify-center ${
-                        task.completed
-                          ? "bg-blue-600 border-blue-600"
-                          : "border-ash-400"
-                      }`}
-                    >
-                      {task.completed && (
-                        <CheckCircle2 className="size-3 text-white" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <p
-                        className={`text-sm ${task.completed ? "line-through text-ash-500" : "text-ash-700"}`}
-                      >
-                        {task.title}
-                      </p>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <div
-                          className={`w-2 h-2 rounded-full bg-gradient-to-r ${getPriorityColor(task.priority)}`}
-                        ></div>
-                        <span className="text-xs text-ash-500 capitalize">
-                          {task.priority} priority
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-1 text-xs text-ash-500">
-                      <Clock className="size-3" />
-                      <span>{task.time}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        {/* AI-Powered Task Plan- Today's Tasks*/}
+      <Card className="glass-card border-0 shadow-card border-ash-200">
+        <CardHeader className="pb-3 flex justify-between items-center">
+          <div className="flex items-center space-x-2">
+            <Zap className="size-5 text-blue-600" />
+            <CardTitle className="text-lg text-gradient">AI Task Plan</CardTitle>
+          </div>
+          <Badge className="bg-blue-100 text-blue-700">
+            {todaysTasks.filter(t => !t.completed).length + rescheduledTasks.length} tasks remaining
+          </Badge>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+           {[...todaysTasks, ...rescheduledTasks].map(task => (
+             <div key={task.id} className="glass-card p-3 rounded-xl hover:shadow-glow flex justify-between items-center">
+               <div>
+                 <p className="font-medium text-ash-800">{task.title}</p>
+                 <div className="flex space-x-2 mt-1 text-xs text-ash-500 items-center">
+                   {/* Add priority badge here */}
+                   {task.priority && (
+                     <div className={`p-1 rounded-full text-white text-[10px] ${getPriorityColor(task.priority)}`}>
+                       {task.priority}
+                     </div>
+                   )}
 
+                   {task.category && <span>{task.category}</span>}
+                   {task.importanceScore !== undefined && <span>AI Score: {Math.round(task.importanceScore * 100)}%</span>}
+                   {task.recommendedTime && <span>Time: {task.recommendedTime}</span>}
+                   {task.dueDate && rescheduledTasks.some(t => t.id === task.id) && (
+                     <Badge className="bg-yellow-200 text-yellow-800 text-[10px] px-1 rounded">Rescheduled</Badge>
+                   )}
+                 </div>
+               </div>
+               <Button
+                 size="sm"
+                 onClick={() => console.log("Mark complete", task.id)}
+                 className={`rounded-full ${task.completed ? "bg-green-500" : "bg-ash-200"}`}
+               >
+                 ✓
+               </Button>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-3">
           <Button
@@ -241,6 +240,23 @@ export function DashboardScreen({ user, goals, habits, onNavigate }) {
             <span className="text-sm text-ash-700">AI Coach</span>
           </Button>
         </div>
+        <Card className="glass-card shadow-card bg-gradient-to-r from-blue-50 to-ash-50">
+          <CardHeader>
+            <div className="flex items-center space-x-2">
+              <Heart className="size-5 text-red-500" />
+              <CardTitle className="text-lg text-gradient">Mood & Motivation</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-ash-700">
+              Based on your recent tasks and streaks, your mood is predicted to be: <strong>Happy</strong> 😊
+            </p>
+            <p className="text-xs text-ash-500 mt-1">
+              AI Tip: Complete your high priority task first to boost your energy!
+            </p>
+          </CardContent>
+        </Card>
+
 
         {/* Motivational Quote */}
         <Card className="glass-card border-0 bg-gradient-to-r from-blue-50 to-ash-50 shadow-card overflow-hidden border-ash-200">
