@@ -573,29 +573,29 @@ export function GoalSetupScreen({ onGoalSetup, user }) {
         >
           <ArrowLeft className="size-4" />
         </Button>
-        <h1 className="flex-1 text-center text-gradient">Goal Details</h1>
+        <h1 className="flex-1 text-center text-gradient text-lg" style={{ marginLeft: '-1.10rem' }}>Goal Details</h1>
       </div>
 
       <div className="p-6 space-y-6">
         {/* Category Badge */}
         <div className="flex justify-center">
           <Badge
-            className={`bg-gradient-to-r ${category?.color} text-white px-4 py-2 shadow-lg`}
+            className={`bg-gradient-to-r ${category?.color} text-white px-6 py-2 shadow-base text-lg`}
           >
-            <category.icon className="size-4 mr-2" />
+            <category.icon className="size-6 mr-1" />
             {category?.label}
           </Badge>
         </div>
-
-        <Card className="glass-card border-0 shadow-card border-ash-200">
-          <CardHeader>
-            <CardTitle className="text-gradient">
-              Tell us about your {category?.label.toLowerCase()} goal
+        <div>
+            <CardTitle className="text-gradient flex justify-center text-lg">
+                Tell us about your {category?.label.toLowerCase()} goal
             </CardTitle>
-            <CardDescription className="text-ash-600">
-              We'll create a personalized roadmap to help you succeed.
+            <CardDescription className="text-ash-600 text-center">
+                 We'll create a personalized roadmap to help you succeed.
             </CardDescription>
-          </CardHeader>
+        </div>
+        <Card className="glass-card border-0 shadow-card border-ash-200">
+          <CardHeader className="py-0 my-0"></CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Basic Goal Info */}
@@ -667,7 +667,7 @@ export function GoalSetupScreen({ onGoalSetup, user }) {
               ))}
 
               <div className="space-y-2">
-                <Label htmlFor="timeframe" className="text-ash-700">
+                <Label htmlFor="timeframe" className="text-ash-720">
                   Target Timeframe
                 </Label>
                 <Select
