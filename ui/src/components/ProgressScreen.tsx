@@ -264,7 +264,7 @@ export function ProgressScreen({ goals, habits, moodHistory, onNavigate }) {
                       </p>
                     </div>
                     {achievement.earned && (
-                      <Award className="size-5 text-yellow-500" />
+                      <Award className="size-6 text-green-500" />
                     )}
                   </div>
                 );
