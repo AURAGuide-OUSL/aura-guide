@@ -1,0 +1,83 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build outputs
+dist/
+build/
+.vite/
+*.local
+**/dist/
+**/build/
+
+# IDE - IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# IDE - VS Code
+.vscode/
+*.code-workspace
+
+# IDE - Other
+*.swp
+*.swo
+*~
+
+# Capacitor / Native builds
+android/
+ios/
+.capacitor/
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
+*.certSigningRequest
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Testing
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Expo
+.expo/
+.expo-shared/
+**/.expo/
+
+# Go module files
+go.sum
