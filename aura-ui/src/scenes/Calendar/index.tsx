@@ -22,13 +22,13 @@ export function CalendarScreen({ onBack }: { onBack: () => void }) {
               ]}
             >
               <Text style={{ color: i === 14 ? palette.surface : palette.text, fontWeight: "700" }}>{i + 1}</Text>
-            </Text>
+            </View>
           ))}
         </View>
       </AppCard>
 
       <View style={commonStyles.stackMd}>
-        {calendarEvents.map((event) => (
+        {calendarEvents.map((event: { id: React.Key | null | undefined; month: string | number | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | null | undefined; day: string | number | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | null | undefined; title: string | number | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | null | undefined; time: string | number | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | null | undefined; }) => (
           <AppCard key={event.id} style={styles.eventRow}>
             <View style={styles.eventTimeBox}>
               <Text style={styles.eventMonth}>{event.month}</Text>
