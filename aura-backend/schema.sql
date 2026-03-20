@@ -38,13 +38,14 @@ CREATE TABLE goals (
 CREATE TABLE user_student (
    id SERIAL PRIMARY KEY,
    goal_id INT REFERENCES goals(id),
-   email VARCHAR(255),
+   email VARCHAR(255) UNIQUE,
+   password_hash TEXT,
    first_name VARCHAR(100),
    last_name VARCHAR(100),
    degree_program VARCHAR(255),
    study_year INT,
    university VARCHAR(255),
-   current_score INT,
+   current_score INT DEFAULT 0,
    recommendation TEXT
 );
 
@@ -146,74 +147,9 @@ CREATE TABLE user_notification (
    is_read BOOLEAN
 );
 
--- =========================
 -- SEED DATA
--- =========================
+INSERT INTO status (name) VALUES ('pending'), ('in_progress'), ('completed'), ('abandoned');
 
--- 1. CATEGORIES
-INSERT INTO category (name) VALUES
-('Soft Skills'),
-('Technical Skills');
+INSERT INTO category (name) VALUES ('Technical'), ('Soft Skills'), ('Academic');
 
--- 2. SKILLS
--- Soft Skills
-INSERT INTO skills (name, category_id) VALUES
-('Professional Communication', 1),
-('Behavioral Interview Skills', 1),
-('Reflection and Self Assessment', 1);
-
--- Technical Skills
-INSERT INTO skills (name, category_id) VALUES
-('Code Understanding', 2),
-('Debugging Reasoning', 2),
-('Algorithmic Thinking', 2),
-('Git Concept Knowledge', 2);
-
--- 3. GOALS
-INSERT INTO goals (name) VALUES
-('Software Engineer'),
-('QA Engineer'),
-('Backend Developer'),
-('DevOps');
-
--- 4. SKILL LEVELS
-INSERT INTO skill_matrix_levels (score_id, level) VALUES
-(1, 'Beginner'),
-(2, 'Intermediate'),
-(3, 'Advanced');
-
--- 5. SAMPLE USER
-INSERT INTO user_student (
-    goal_id,
-    email,
-    first_name,
-    last_name,
-    degree_program,
-    study_year,
-    university,
-    current_score,
-    recommendation
-) VALUES (
-    1, -- Software Engineer
-    'testuser@example.com',
-    'Nimal',
-    'Perera',
-    'Computer Science',
-    3,
-    'University of Colombo',
-    50,
-    'Focus on improving debugging and communication skills'
-);
-
--- 6. ASSIGN SKILLS TO USER
-INSERT INTO user_skills (user_id, skill_id, score_id) VALUES
-(1, 1, 2), -- Communication - Intermediate
-(1, 2, 1), -- Behavioral - Beginner
-(1, 4, 2), -- Code Understanding - Intermediate
-(1, 5, 1); -- Debugging - Beginner
-
--- 7. SAMPLE STATUS
-INSERT INTO status (name) VALUES
-('Pending'),
-('In Progress'),
-('Completed');
+INSERT INTO goals (name) VALUES ('Software Engineer'), ('Backend Developer'), ('QA Engineer');
