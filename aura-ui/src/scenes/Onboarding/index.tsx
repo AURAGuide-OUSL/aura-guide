@@ -12,14 +12,16 @@ import { initialProfile } from "../../constants";
 
 export function OnboardingScreen({
   initialEmail,
+  initialPassword,
   onComplete,
 }: {
   initialEmail: string;
-  onComplete: (profile: UserProfile) => void;
+  initialPassword?: string;
+  onComplete: (profile: any) => void;
 }) {
   const [step, setStep] = useState(1);
-  const [firstName, setFirstName] = useState("John");
-  const [lastName, setLastName] = useState("Doe");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState(initialEmail || initialProfile.email);
   const [university, setUniversity] = useState(initialProfile.university);
   const [degreeProgram, setDegreeProgram] = useState(initialProfile.degreeProgram);
@@ -47,8 +49,8 @@ export function OnboardingScreen({
 
         {step === 1 ? (
           <View style={commonStyles.stackMd}>
-            <InputField label="First Name" placeholder="John" value={firstName} onChangeText={setFirstName} />
-            <InputField label="Last Name" placeholder="Doe" value={lastName} onChangeText={setLastName} />
+            <InputField label="First Name" placeholder="Enter your first name" value={firstName} onChangeText={setFirstName} />
+            <InputField label="Last Name" placeholder="Enter your last name" value={lastName} onChangeText={setLastName} />
             <InputField
               label="Email"
               placeholder="you@university.edu"
@@ -106,11 +108,11 @@ export function OnboardingScreen({
                 firstName,
                 lastName,
                 email,
+                password: initialPassword,
                 university,
-                degreeProgram,
-                studyYear,
-                goal,
-                joinedDate: initialProfile.joinedDate,
+                degree_program: degreeProgram,
+                study_year: parseInt(studyYear) || 1,
+                goal_id: 1, // Defaulting for now
               });
             }}
             disabled={!canContinue}

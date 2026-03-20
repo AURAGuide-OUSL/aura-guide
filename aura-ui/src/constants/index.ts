@@ -3,14 +3,14 @@ import { Message, TabRoute, UserProfile } from "../types";
 export const tabRoutes: TabRoute[] = ["dashboard", "aiCoach", "tasks", "goals", "profile"];
 
 export const initialProfile: UserProfile = {
-  firstName: "John",
-  lastName: "Doe",
-  email: "john.doe@university.edu",
-  university: "University of Technology",
-  degreeProgram: "Computer Science",
-  studyYear: "3rd Year",
-  goal: "Software Engineer",
-  joinedDate: "January 2026",
+  firstName: "",
+  lastName: "",
+  email: "",
+  university: "",
+  degreeProgram: "",
+  studyYear: "",
+  goal: "",
+  joinedDate: "",
 };
 
 export const initialMessages: Message[] = [
