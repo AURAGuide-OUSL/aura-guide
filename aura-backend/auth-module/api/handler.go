@@ -20,7 +20,7 @@ type AuthRequest struct {
 }
 
 func RegisterHandlers(mux http.Handler) {
-	// Handlers are usually registered in main, but we can provide helpers
+	// TODO
 }
 
 func SignupHandler(w http.ResponseWriter, r *http.Request) {
