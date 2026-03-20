@@ -91,7 +91,7 @@ export function ProfileScreen({
 
       <AppCard style={commonStyles.stackMd}>
         <Text style={styles.sectionTitle}>CV status</Text>
-        <Text style={commonStyles.cardBody}>Resume_JohnDoe_2026.pdf uploaded on March 15, 2026.</Text>
+        <Text style={commonStyles.cardBody}>resume_2026.pdf uploaded on March 15, 2026.</Text>
         <View style={styles.actionRow}>
           <PrimaryButton label="Download" onPress={() => undefined} secondary />
           <PrimaryButton label="Upload New" onPress={() => undefined} />

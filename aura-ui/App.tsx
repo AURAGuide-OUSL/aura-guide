@@ -28,10 +28,14 @@ import { CalendarScreen } from "./src/scenes/Calendar";
 import { CareerTrackScreen } from "./src/scenes/CareerTrack";
 import { TermsScreen } from "./src/scenes/Terms";
 
+import { api } from "./src/api/api";
+
 export default function App() {
   const [route, setRoute] = useState<Route>("splash");
   const [tab, setTab] = useState<TabRoute>("dashboard");
   const [user, setUser] = useState<UserProfile>(initialProfile);
+  const [tempPassword, setTempPassword] = useState("");
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [notifications, setNotifications] = useState(notificationSeed);
   const [settings, setSettings] = useState({
     notifications: true,
@@ -39,21 +43,75 @@ export default function App() {
     language: "English (US)",
   });
 
+  const fetchProfile = async () => {
+    try {
+      const profileData = await api.getUserProfile();
+      // Map backend fields to frontend UserProfile
+      setUser({
+        firstName: profileData.first_name,
+        lastName: profileData.last_name,
+        email: profileData.email,
+        university: profileData.university,
+        degreeProgram: profileData.degree_program,
+        studyYear: profileData.study_year.toString(),
+        goal: profileData.goal_id === 1 ? "Software Engineer" : "Developer",
+        joinedDate: initialProfile.joinedDate,
+      });
+      return true;
+    } catch (err) {
+      return false;
+    }
+  };
+
   useEffect(() => {
-    const timer = setTimeout(() => setRoute("signin"), 2200);
+    const checkAuth = async () => {
+      const ok = await fetchProfile();
+      if (ok) {
+        setRoute("dashboard");
+      } else {
+        setRoute("signin");
+      }
+      setIsCheckingAuth(false);
+    };
+
+    const timer = setTimeout(checkAuth, 2000); // Keep splash for a bit
     return () => clearTimeout(timer);
   }, []);
 
-  const handleSignIn = () => setRoute("dashboard");
-  const handleSignUp = (email: string) => {
+  const handleSignIn = async (email?: string, password?: string) => {
+    if (email && password) {
+      try {
+        await api.login({ email, password });
+        const ok = await fetchProfile();
+        if (ok) setRoute("dashboard");
+      } catch (err) {
+        alert("Login failed: " + (err as Error).message);
+      }
+    } else {
+      // Legacy or manual trigger
+      setRoute("dashboard");
+    }
+  };
+
+  const handleSignUp = (email: string, password?: string) => {
     setUser((prev) => ({ ...prev, email }));
+    if (password) setTempPassword(password);
     setRoute("onboarding");
   };
-  const handleOnboardingComplete = (profile: UserProfile) => {
-    setUser(profile);
-    setRoute("dashboard");
+
+  const handleOnboardingComplete = async (profile: any) => {
+    try {
+      // profile already contains all fields + password
+      await api.signup(profile);
+      alert("Signup successful! Please sign in with your credentials.");
+      setRoute("signin");
+    } catch (err) {
+      alert("Signup failed: " + (err as Error).message);
+    }
   };
-  const handleSignOut = () => {
+
+  const handleSignOut = async () => {
+    await api.logout();
     setRoute("signin");
     setTab("dashboard");
   };
@@ -67,7 +125,7 @@ export default function App() {
       case "signin":
         return (
           <SignInScreen
-            onSignIn={handleSignIn}
+            onSignIn={(email: string | undefined, password: string | undefined) => handleSignIn(email, password)}
             onOpenSignUp={() => setRoute("signup")}
             onOpenReset={() => setRoute("resetPassword")}
           />
@@ -83,7 +141,9 @@ export default function App() {
       case "resetPassword":
         return <ResetPasswordScreen onBack={() => setRoute("signin")} />;
       case "onboarding":
-        return <OnboardingScreen initialEmail={user.email} onComplete={handleOnboardingComplete} />;
+        return (
+          <OnboardingScreen initialEmail={user.email} initialPassword={tempPassword} onComplete={handleOnboardingComplete} />
+        );
       case "dashboard":
         return <DashboardScreen user={user} onNavigate={setRoute} onSignOut={handleSignOut} />;
       case "aiCoach":
@@ -132,7 +192,7 @@ export default function App() {
         <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
           {renderContent()}
         </SafeAreaView>
-        {showTabs && <BottomTabs current={tab} onNavigate={(route) => setTab(route)} />}
+        {showTabs && <BottomTabs current={tab} onNavigate={(route: TabRoute) => setTab(route)} />}
       </View>
     </SafeAreaProvider>
   );

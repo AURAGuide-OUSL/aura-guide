@@ -14,7 +14,7 @@ export function SignUpScreen({
 }: {
   onOpenTerms: () => void;
   onOpenSignIn: () => void;
-  onContinue: (email: string) => void;
+  onContinue: (email: string, password: string) => void;
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -40,7 +40,7 @@ export function SignUpScreen({
     }
 
     setError("");
-    onContinue(email);
+    onContinue(email, password);
   };
 
   return (

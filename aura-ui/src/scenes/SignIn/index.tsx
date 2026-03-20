@@ -13,7 +13,7 @@ export function SignInScreen({
   onOpenSignUp,
   onOpenReset,
 }: {
-  onSignIn: () => void;
+  onSignIn: (email?: string, password?: string) => void;
   onOpenSignUp: () => void;
   onOpenReset: () => void;
 }) {
@@ -55,7 +55,7 @@ export function SignInScreen({
           <TextLink label="Forgot password?" onPress={onOpenReset} />
         </View>
 
-        <PrimaryButton label="Sign In" onPress={onSignIn} />
+        <PrimaryButton label="Sign In" onPress={() => onSignIn(email, password)} />
       </AppCard>
 
       <View style={styles.authFooter}>

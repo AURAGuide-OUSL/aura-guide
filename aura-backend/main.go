@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"aura-backend/common/db"
 	"aura-backend/common/middleware"
@@ -15,9 +16,16 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	mid "github.com/go-chi/chi/v5/middleware"
+	"github.com/joho/godotenv"
+	"github.com/rs/cors"
 )
 
 func main() {
+	// Load environment variables
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, using system environment variables")
+	}
+
 	// Initialize Database
 	if err := db.InitDB(); err != nil {
 		log.Fatalf("Database initialization failed: %v", err)
@@ -26,6 +34,17 @@ func main() {
 
 	// Initialize Router
 	r := chi.NewRouter()
+
+	// CORS Setup
+	allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
+	c := cors.New(cors.Options{
+		AllowedOrigins:   strings.Split(allowedOrigins, ","),
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		AllowCredentials: true,
+		MaxAge:           300,
+	})
+	r.Use(c.Handler)
 
 	// Global Middleware
 	r.Use(mid.Logger)
