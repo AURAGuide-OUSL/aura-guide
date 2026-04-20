@@ -1,0 +1,35 @@
+package taskplan
+
+import "time"
+
+type CareerPathResponse struct {
+	User       string `json:"user"`
+	GoalID     *int   `json:"goal_id,omitempty"`
+	CareerPath string `json:"career_path"`
+}
+
+type SkillScoreResponse struct {
+	CurrentScore int    `json:"current_score"`
+	SkillLevel   string `json:"skill_level"`
+}
+
+type Task struct {
+	ID            int        `json:"id"`
+	SkillID       *int       `json:"skill_id,omitempty"`
+	Task          string     `json:"task"`
+	Status        string     `json:"status"`
+	StartDateTime *time.Time `json:"start_date_time,omitempty"`
+	EndDateTime   *time.Time `json:"end_date_time,omitempty"`
+}
+
+type GeneratePlanResponse struct {
+	Message string `json:"message"`
+	Tasks   []Task `json:"tasks"`
+}
+
+type UpdateTaskRequest struct {
+	Task          *string    `json:"task"`
+	Status        *string    `json:"status"`
+	StartDateTime *time.Time `json:"start_date_time"`
+	EndDateTime   *time.Time `json:"end_date_time"`
+}

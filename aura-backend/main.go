@@ -7,12 +7,22 @@ import (
 	"os"
 	"strings"
 
+	auraLifeCoachApi "aura-backend/aura-life-coach-module/api"
+	authApi "aura-backend/auth-module/api"
+	badgeApi "aura-backend/badge-module/api"
+	calendarApi "aura-backend/calendar-module/api"
 	"aura-backend/common/db"
 	"aura-backend/common/middleware"
-	authApi "aura-backend/auth-module/api"
-	userApi "aura-backend/user-module/api"
-	skillApi "aura-backend/skill-module/api"
+	ethicsApi "aura-backend/ethical-validator-module/api"
 	goalApi "aura-backend/goal-module/api"
+	notificationApi "aura-backend/notification-module/api"
+	onboardingApi "aura-backend/onboarding-module/api"
+	progressApi "aura-backend/progress-module/api"
+	settingsApi "aura-backend/settings-module/api"
+	skillGapApi "aura-backend/skill-gap-analysis-module/api"
+	skillApi "aura-backend/skill-module/api"
+	taskPlanApi "aura-backend/task-plan-module/api"
+	userApi "aura-backend/user-module/api"
 
 	"github.com/go-chi/chi/v5"
 	mid "github.com/go-chi/chi/v5/middleware"
@@ -21,21 +31,17 @@ import (
 )
 
 func main() {
-	// Load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, using system environment variables")
 	}
 
-	// Initialize Database
 	if err := db.InitDB(); err != nil {
 		log.Fatalf("Database initialization failed: %v", err)
 	}
 	defer db.CloseDB()
 
-	// Initialize Router
 	r := chi.NewRouter()
 
-	// CORS Setup
 	allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
 	c := cors.New(cors.Options{
 		AllowedOrigins:   strings.Split(allowedOrigins, ","),
@@ -46,27 +52,75 @@ func main() {
 	})
 	r.Use(c.Handler)
 
-	// Global Middleware
 	r.Use(mid.Logger)
 	r.Use(mid.Recoverer)
 
-	// Auth Routes (Public)
 	r.Post("/signup", authApi.SignupHandler)
 	r.Post("/login", authApi.LoginHandler)
+	r.Post("/auth/signup", authApi.SignupHandler)
+	r.Post("/auth/signin", authApi.SigninHandler)
+	r.Post("/auth/signout", authApi.SignoutHandler)
 
-	// Protected Routes (User Module)
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware)
-		
+
 		r.Get("/user", userApi.GetUserHandler)
 		r.Put("/user", userApi.UpdateUserHandler)
 		r.Get("/users", userApi.GetAllUsersHandler)
+		r.Get("/users/profile/{user}", userApi.GetProfileHandler)
+		r.Put("/users/profile/{user}", userApi.UpdateProfileHandler)
+		r.Delete("/users/profile/{user}", userApi.DeleteProfileHandler)
+
 		r.Get("/skills", skillApi.GetSkillsHandler)
 		r.Get("/skill/categories", skillApi.GetCategoriesHandler)
 		r.Get("/goals", goalApi.GetGoalsHandler)
+
+		r.Put("/onboarding/{userData}", onboardingApi.UpdateOnboardingHandler)
+
+		r.Get("/aura-life-coach/ProfessionalCommunicationQuestions", auraLifeCoachApi.GetProfessionalCommunicationQuestionsHandler)
+		r.Get("/aura-life-coach/BehavioralInterviewQuestions", auraLifeCoachApi.GetBehavioralInterviewQuestionsHandler)
+		r.Get("/aura-life-coach/Reflection and Self AssessmentQuestions", auraLifeCoachApi.GetReflectionSelfAssessmentQuestionsHandler)
+		r.Get("/aura-life-coach/CodeUnderstandingQuestions", auraLifeCoachApi.GetCodeUnderstandingQuestionsHandler)
+		r.Get("/aura-life-coach/DebuggingReasoningQuestions", auraLifeCoachApi.GetDebuggingReasoningQuestionsHandler)
+		r.Get("/aura-life-coach/AlgorithmicThinkingQuestions", auraLifeCoachApi.GetAlgorithmicThinkingQuestionsHandler)
+		r.Get("/aura-life-coach/GitConceptKnowledgeQuestions", auraLifeCoachApi.GetGitConceptKnowledgeQuestionsHandler)
+		r.Get("/aura-life-coach/BehavioralInterviewFeedback", auraLifeCoachApi.GetBehavioralInterviewFeedbackHandler)
+		r.Post("/aura-life-coach/cv/upload", auraLifeCoachApi.UploadCVHandler)
+		r.Post("/aura-life-coach/cv/analyze", auraLifeCoachApi.AnalyzeCVHandler)
+		r.Get("/aura-life-coach/cv/feedback", auraLifeCoachApi.GetCVFeedbackHandler)
+
+		r.Post("/aura-ethical-validator/answer", ethicsApi.ValidateAnswerHandler)
+		r.Get("/aura-ethical-validator/answer/status", ethicsApi.GetValidationStatusHandler)
+
+		r.Get("/user/careerPath", taskPlanApi.GetCareerPathHandler)
+		r.Get("/user/skilScore", taskPlanApi.GetSkillScoreHandler)
+		r.Get("/task-plan/generatePlan", taskPlanApi.GeneratePlanHandler)
+		r.Get("/task-plan/taskPlan", taskPlanApi.GetTaskPlanHandler)
+		r.Put("/task-plan/{taskId}", taskPlanApi.UpdateTaskPlanHandler)
+		r.Get("/task-plan/task/{today}", taskPlanApi.GetTasksForDateHandler)
+		r.Put("/task-plan/tasks/{taskId}/complete", taskPlanApi.CompleteTaskHandler)
+		r.Put("/task-plan/tasks/{taskId}", taskPlanApi.UpdateTaskHandler)
+		r.Delete("/task-plan/tasks/{taskId}", taskPlanApi.DeleteTaskHandler)
+
+		r.Get("/progress/overview", progressApi.GetOverviewHandler)
+		r.Get("/progress/currentTask", progressApi.GetCurrentTaskHandler)
+		r.Get("/progress/CompletedTasks", progressApi.GetCompletedTasksHandler)
+
+		r.Get("/badges/earned", badgeApi.GetEarnedBadgesHandler)
+
+		r.Get("/calendar/events", calendarApi.GetEventsHandler)
+		r.Post("/calendar/add-event", calendarApi.AddEventHandler)
+
+		r.Get("/skillScore/skillLevel", skillGapApi.GetSkillLevelsHandler)
+		r.Get("/skill-gap-analysis/skillGap", skillGapApi.GetSkillGapHandler)
+
+		r.Get("/notification/dailyTaskReminder", notificationApi.GetDailyTaskReminderHandler)
+		r.Get("/notification/motivationalQuote", notificationApi.GetMotivationalQuoteHandler)
+
+		r.Post("/settings/preferences", settingsApi.UpdatePreferencesHandler)
+		r.Post("/settings/notificationPreferences", settingsApi.UpdateNotificationPreferencesHandler)
 	})
 
-	// Start Server
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"

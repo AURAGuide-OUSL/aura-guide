@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"net/http"
 	"time"
 
 	"aura-backend/auth-module/dao"
@@ -46,4 +47,16 @@ func Login(ctx context.Context, email, password string) (string, error) {
 	}
 
 	return tokenString, nil
+}
+
+func Signout(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "token",
+		Value:    "",
+		Expires:  time.Unix(0, 0),
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   true,
+		Path:     "/",
+	})
 }
