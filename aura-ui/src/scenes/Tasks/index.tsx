@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, View, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-
 import { palette, commonStyles } from "../../theme";
 import { AppCard } from "../../components/AppCard";
+import { Badge } from "../../components/Badge";
 import { ProgressBar } from "../../components/ProgressBar";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { SegmentedControl } from "../../components/SegmentedControl";
@@ -11,20 +11,28 @@ import { PrimaryButton } from "../../components/PrimaryButton";
 import { InputField } from "../../components/InputField";
 import { api } from "../../api/api";
 
-type TaskStatus = "pending" | "in_progress" | "completed" | string;
-
-function toYYYYMMDD(isoOrDate: string | Date | null | undefined) {
-  if (!isoOrDate) return "";
-  const d = typeof isoOrDate === "string" ? new Date(isoOrDate) : isoOrDate;
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toISOString().slice(0, 10);
+function getPriorityColors(priority: "High" | "Medium" | "Low") {
+  switch (priority) {
+    case "High":
+      return { backgroundColor: "#FEE2E2", textColor: palette.danger };
+    case "Medium":
+      return { backgroundColor: palette.chipYellow, textColor: palette.warning };
+    default:
+      return { backgroundColor: palette.chipGreen, textColor: palette.success };
+  }
 }
 
-function statusToProgress(status: TaskStatus) {
-  const s = (status || "").toLowerCase();
-  if (s === "completed") return 100;
-  if (s === "in_progress") return 60;
-  return 15;
+function getCategoryColor(category: string) {
+  if (category === "Technical") {
+    return { backgroundColor: palette.chipPurple, textColor: palette.secondary };
+  }
+  if (category === "Academic") {
+    return { backgroundColor: palette.chipBlue, textColor: palette.primary };
+  }
+  if (category === "Soft Skills") {
+    return { backgroundColor: "#FCE7F3", textColor: "#BE185D" };
+  }
+  return { backgroundColor: palette.surfaceMuted, textColor: palette.muted };
 }
 
 export function TasksScreen({ onNavigateCalendar }: { onNavigateCalendar: () => void }) {
@@ -33,52 +41,40 @@ export function TasksScreen({ onNavigateCalendar }: { onNavigateCalendar: () => 
   const [tasks, setTasks] = useState<any[]>([]);
   const [newTask, setNewTask] = useState("");
 
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
-
-  const refresh = async () => {
-    const data = await api.getTasks();
-    if (!data?.length) {
-      await api.generateTaskPlan();
-      const generated = await api.getTasks();
-      setTasks(generated || []);
-      return;
+  const loadTasks = async () => {
+    try {
+      const data = await api.getTasks();
+      if (!data?.length) {
+        await api.generateTaskPlan();
+        const generated = await api.getTasks();
+        setTasks(generated);
+        return;
+      }
+      setTasks(data);
+    } catch (error) {
+      Alert.alert("Task loading failed", (error as Error).message);
     }
-    setTasks(data || []);
   };
 
   useEffect(() => {
-    refresh().catch((e) => Alert.alert("Task load failed", (e as Error).message));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadTasks();
   }, []);
 
-  const filtered = useMemo(() => {
-    const normalized = tasks.map((t) => ({
-      ...t,
-      _start: toYYYYMMDD(t.start_date_time),
-      _end: toYYYYMMDD(t.end_date_time),
-      _status: (t.status || "").toLowerCase(),
-    }));
-
-    if (viewMode === "Board") return normalized;
-
-    if (listTab === "Completed") return normalized.filter((t) => t._status === "completed");
-
-    if (listTab === "Today") return normalized.filter((t) => t._status !== "completed" && (t._start === today || t._end === today));
-
-    // Upcoming
-    return normalized.filter((t) => t._status !== "completed" && t._start > today);
-  }, [listTab, tasks, today, viewMode]);
-
-  const moveTask = async (taskId: number, status: TaskStatus) => {
-    await api.updateTask(taskId, { status });
-    await refresh();
-  };
+  const today = new Date().toISOString().slice(0, 10);
+  const todayTasks = tasks.filter((task) => (task.start_date_time || "").slice(0, 10) <= today && (task.status || "").toLowerCase() !== "completed");
+  const upcomingTasks = tasks.filter((task) => (task.start_date_time || "").slice(0, 10) > today && (task.status || "").toLowerCase() !== "completed");
+  const completed = tasks.filter((task) => (task.status || "").toLowerCase() === "completed");
 
   const addTask = async () => {
     if (!newTask.trim()) return;
     await api.addTask({ task: newTask.trim(), status: "pending" });
     setNewTask("");
-    await refresh();
+    await loadTasks();
+  };
+
+  const moveTask = async (task: any, status: string) => {
+    await api.updateTask(task.id, { status });
+    await loadTasks();
   };
 
   return (
@@ -95,68 +91,69 @@ export function TasksScreen({ onNavigateCalendar }: { onNavigateCalendar: () => 
 
       <SegmentedControl options={["List", "Board"]} value={viewMode} onChange={setViewMode} />
 
-      {viewMode === "List" ? <SegmentedControl options={["Today", "Upcoming", "Completed"]} value={listTab} onChange={setListTab} /> : null}
-
       {viewMode === "List" ? (
-        <View style={commonStyles.stackMd}>
-          {filtered.map((task) => {
-            const progress = statusToProgress(task.status);
-            const due = toYYYYMMDD(task.end_date_time) || toYYYYMMDD(task.start_date_time);
-            return (
-              <AppCard key={task.id} style={commonStyles.stackMd}>
-                <View style={styles.cardHeaderSpace}>
-                  <View style={commonStyles.flexOne}>
-                    <Text style={commonStyles.cardTitle}>{task.task}</Text>
-                    <Text style={commonStyles.cardBody}>{due ? `Due: ${due}` : ""}</Text>
+        <>
+          <SegmentedControl options={["Today", "Upcoming", "Completed"]} value={listTab} onChange={setListTab} />
+
+          <View style={commonStyles.stackMd}>
+            {(listTab === "Today" ? todayTasks : listTab === "Upcoming" ? upcomingTasks : completed).map((task) => {
+              const priority = getPriorityColors(task.priority as any);
+              const category = getCategoryColor(task.category || "Technical");
+
+              return (
+                <AppCard key={task.id} style={commonStyles.stackMd}>
+                  <View style={styles.cardHeaderSpace}>
+                    <View style={commonStyles.flexOne}>
+                      <Text style={commonStyles.cardTitle}>{task.task}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={palette.muted} />
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color={palette.muted} />
-                </View>
 
-                <View style={commonStyles.progressSummaryRow}>
-                  <Text style={commonStyles.helperText}>{task.status}</Text>
-                  <Text style={commonStyles.helperText}>{due ? due : "—"}</Text>
-                </View>
+                  <View style={commonStyles.badgeRow}>
+                    <Badge label={task.category || "Technical"} backgroundColor={category.backgroundColor} textColor={category.textColor} />
+                    <Badge label={task.priority || "Medium"} backgroundColor={priority.backgroundColor} textColor={priority.textColor} />
+                  </View>
 
-                <ProgressBar value={progress} />
-
-                <View style={styles.inlineActions}>
-                  <PrimaryButton label="Todo" onPress={() => moveTask(task.id, "pending")} secondary />
-                  <PrimaryButton label="In progress" onPress={() => moveTask(task.id, "in_progress")} secondary />
-                  <PrimaryButton label="Done" onPress={() => moveTask(task.id, "completed")} secondary />
-                </View>
-              </AppCard>
-            );
-          })}
-        </View>
+                  <View style={commonStyles.progressSummaryRow}>
+                    <Text style={commonStyles.helperText}>{task.status}</Text>
+                    <Text style={commonStyles.helperText}>{(task.end_date_time || task.start_date_time || "").slice(0, 10)}</Text>
+                  </View>
+                  <ProgressBar value={task.status === "completed" ? 100 : task.status === "in_progress" ? 60 : 15} />
+                  <View style={styles.inlineActions}>
+                    <PrimaryButton label="Todo" onPress={() => moveTask(task, "pending")} secondary />
+                    <PrimaryButton label="In progress" onPress={() => moveTask(task, "in_progress")} secondary />
+                    <PrimaryButton label="Done" onPress={() => moveTask(task, "completed")} secondary />
+                  </View>
+                </AppCard>
+              );
+            })}
+          </View>
+        </>
       ) : (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={styles.boardRow}>
             {[
-              { title: "To Do", status: "pending" },
-              { title: "In Progress", status: "in_progress" },
-              { title: "Done", status: "completed" },
-            ].map((column) => {
-              const colItems = filtered.filter((t) => (t.status || "").toLowerCase() === column.status);
-              return (
-                <View key={column.title} style={styles.boardColumn}>
-                  <Text style={styles.boardTitle}>{column.title}</Text>
-                  <View style={commonStyles.stackSm}>
-                    {colItems.map((task) => (
-                      <AppCard key={task.id} style={styles.boardCard}>
-                        <Text style={commonStyles.cardTitle}>{task.task}</Text>
-                        <Text style={commonStyles.cardBody}>{toYYYYMMDD(task.end_date_time) || "—"}</Text>
-
-                        <View style={styles.inlineActions}>
-                          <PrimaryButton label="Todo" onPress={() => moveTask(task.id, "pending")} secondary />
-                          <PrimaryButton label="In" onPress={() => moveTask(task.id, "in_progress")} secondary />
-                          <PrimaryButton label="Done" onPress={() => moveTask(task.id, "completed")} secondary />
-                        </View>
-                      </AppCard>
-                    ))}
-                  </View>
+              { title: "To Do", items: upcomingTasks },
+              { title: "In Progress", items: todayTasks },
+              { title: "Done", items: completed },
+            ].map((column) => (
+              <View key={column.title} style={styles.boardColumn}>
+                <Text style={styles.boardTitle}>{column.title}</Text>
+                <View style={commonStyles.stackSm}>
+                  {column.items.map((task) => (
+                    <AppCard key={task.id} style={styles.boardCard}>
+                      <Text style={commonStyles.cardTitle}>{task.task}</Text>
+                      <Text style={commonStyles.cardBody}>{(task.start_date_time || "").slice(0, 10)}</Text>
+                      <View style={styles.inlineActions}>
+                        <PrimaryButton label="Todo" onPress={() => moveTask(task, "pending")} secondary />
+                        <PrimaryButton label="In progress" onPress={() => moveTask(task, "in_progress")} secondary />
+                        <PrimaryButton label="Done" onPress={() => moveTask(task, "completed")} secondary />
+                      </View>
+                    </AppCard>
+                  ))}
                 </View>
-              );
-            })}
+              </View>
+            ))}
           </View>
         </ScrollView>
       )}
@@ -192,30 +189,26 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 12,
   },
-  inlineActions: {
-    flexDirection: "row",
-    gap: 8,
-    flexWrap: "wrap",
-    marginTop: 8,
-  },
   boardRow: {
     flexDirection: "row",
     gap: 14,
     paddingVertical: 6,
   },
   boardColumn: {
-    width: 260,
+    width: 230,
     gap: 10,
   },
   boardTitle: {
     fontSize: 16,
     fontWeight: "800",
     color: palette.text,
-    marginBottom: 6,
   },
   boardCard: {
     gap: 6,
-    padding: 10,
+  },
+  inlineActions: {
+    flexDirection: "row",
+    gap: 8,
+    flexWrap: "wrap",
   },
 });
-

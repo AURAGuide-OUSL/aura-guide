@@ -1,7 +1,6 @@
 import React from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View, Switch } from "react-native";
+import { ScrollView, StyleSheet, Switch, Text, View, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-
 import { palette, commonStyles } from "../../theme";
 import { AppCard } from "../../components/AppCard";
 import { PrimaryButton } from "../../components/PrimaryButton";
@@ -84,4 +83,3 @@ const styles = StyleSheet.create({
     gap: 12,
   },
 });
-

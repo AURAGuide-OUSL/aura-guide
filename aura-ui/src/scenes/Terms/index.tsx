@@ -12,7 +12,7 @@ export function TermsScreen({ onBack }: { onBack: () => void }) {
 
       <AppCard style={commonStyles.stackMd}>
         {termsSections.map((section) => (
-          <View key={section.title} style={commonStyles.stackSm}>
+          <View key={section.title}>
             <Text style={styles.termsTitle}>{section.title}</Text>
             <Text style={styles.termsText}>{section.body}</Text>
           </View>
@@ -33,12 +33,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "800",
     color: palette.text,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   termsText: {
     color: palette.muted,
     lineHeight: 22,
-    marginBottom: 6,
+    marginBottom: 8,
   },
 });
-

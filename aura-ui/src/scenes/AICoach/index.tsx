@@ -1,15 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-
 import { palette, commonStyles } from "../../theme";
 import { Badge } from "../../components/Badge";
 import { ScreenHeader } from "../../components/ScreenHeader";
-import { PrimaryButton } from "../../components/PrimaryButton";
-
 import { Message } from "../../types";
 import { initialMessages } from "../../constants";
 import { quickPrompts } from "../../../src-native/mockData";
+import { PrimaryButton } from "../../components/PrimaryButton";
 import { api } from "../../api/api";
 
 function getAuraResponse(message: string) {
@@ -58,12 +56,10 @@ export function AICoachScreen() {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
-
-  // Text-based CV analysis for demo.
   const [cvName, setCvName] = useState("");
   const [cvContent, setCvContent] = useState("");
   const [cvFeedback, setCvFeedback] = useState<string[]>([]);
+  const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });
@@ -71,7 +67,9 @@ export function AICoachScreen() {
 
   const sendMessage = (text?: string) => {
     const content = (text ?? input).trim();
-    if (!content) return;
+    if (!content) {
+      return;
+    }
 
     const nextUserMessage: Message = {
       id: Date.now(),
@@ -101,7 +99,9 @@ export function AICoachScreen() {
   };
 
   const analyzeCV = async () => {
-    if (!cvName.trim() || !cvContent.trim()) return;
+    if (!cvName.trim() || !cvContent.trim()) {
+      return;
+    }
     try {
       await api.uploadCV(cvName.trim(), cvContent.trim());
       await api.analyzeCV();
@@ -133,7 +133,6 @@ export function AICoachScreen() {
       <ScrollView ref={scrollRef} contentContainerStyle={styles.chatBody}>
         <View style={styles.cvCard}>
           <Text style={styles.cvTitle}>CV status</Text>
-
           <TextInput
             value={cvName}
             onChangeText={setCvName}
@@ -141,7 +140,6 @@ export function AICoachScreen() {
             placeholderTextColor={palette.muted}
             style={styles.cvInput}
           />
-
           <TextInput
             value={cvContent}
             onChangeText={setCvContent}
@@ -150,13 +148,9 @@ export function AICoachScreen() {
             style={[styles.cvInput, styles.cvInputMultiline]}
             multiline
           />
-
           <PrimaryButton label="Upload & Analyze CV" onPress={analyzeCV} />
-
           {cvFeedback.map((line, index) => (
-            <Text key={index} style={styles.cvFeedback}>
-              {`- ${line}`}
-            </Text>
+            <Text key={index} style={styles.cvFeedback}>{`\u2022 ${line}`}</Text>
           ))}
         </View>
 
@@ -328,7 +322,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 12,
     gap: 8,
-    marginBottom: 6,
   },
   cvTitle: {
     fontSize: 16,
@@ -353,4 +346,3 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 });
-
