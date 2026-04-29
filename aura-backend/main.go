@@ -98,6 +98,7 @@ func main() {
 		r.Get("/task-plan/taskPlan", taskPlanApi.GetTaskPlanHandler)
 		r.Put("/task-plan/{taskId}", taskPlanApi.UpdateTaskPlanHandler)
 		r.Get("/task-plan/task/{today}", taskPlanApi.GetTasksForDateHandler)
+		r.Post("/task-plan/tasks", taskPlanApi.AddTaskHandler)
 		r.Put("/task-plan/tasks/{taskId}/complete", taskPlanApi.CompleteTaskHandler)
 		r.Put("/task-plan/tasks/{taskId}", taskPlanApi.UpdateTaskHandler)
 		r.Delete("/task-plan/tasks/{taskId}", taskPlanApi.DeleteTaskHandler)

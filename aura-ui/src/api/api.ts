@@ -2,6 +2,15 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const API_BASE_URL = "http://localhost:8080"; // local IP if testing on a device
 
+async function authHeaders(contentType = true) {
+  const token = await AsyncStorage.getItem("auth_token");
+  if (!token) throw new Error("No auth token found");
+  return {
+    ...(contentType ? { "Content-Type": "application/json" } : {}),
+    Authorization: `Bearer ${token}`,
+  };
+}
+
 export const api = {
   /**
    * Register a new user with comprehensive profile data.
@@ -42,14 +51,101 @@ export const api = {
    * this request includes the 'Authorization' Bearer token from AsyncStorage.
    */
   async getUserProfile() {
-    const token = await AsyncStorage.getItem("auth_token");
-    if (!token) throw new Error("No auth token found");
-
     const response = await fetch(`${API_BASE_URL}/user`, {
       method: "GET",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-      },
+      headers: await authHeaders(false),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
+  async updateUserProfile(data: any) {
+    const response = await fetch(`${API_BASE_URL}/user`, {
+      method: "PUT",
+      headers: await authHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
+  async getCareerPath() {
+    const response = await fetch(`${API_BASE_URL}/user/careerPath`, {
+      method: "GET",
+      headers: await authHeaders(false),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
+  async getSkillScore() {
+    const response = await fetch(`${API_BASE_URL}/user/skilScore`, {
+      method: "GET",
+      headers: await authHeaders(false),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
+  async getTasks() {
+    const response = await fetch(`${API_BASE_URL}/task-plan/taskPlan`, {
+      method: "GET",
+      headers: await authHeaders(false),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
+  async generateTaskPlan() {
+    const response = await fetch(`${API_BASE_URL}/task-plan/generatePlan`, {
+      method: "GET",
+      headers: await authHeaders(false),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
+  async addTask(data: any) {
+    const response = await fetch(`${API_BASE_URL}/task-plan/tasks`, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
+  async updateTask(taskId: number, data: any) {
+    const response = await fetch(`${API_BASE_URL}/task-plan/tasks/${taskId}`, {
+      method: "PUT",
+      headers: await authHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
+  async completeTask(taskId: number) {
+    const response = await fetch(`${API_BASE_URL}/task-plan/tasks/${taskId}/complete`, {
+      method: "PUT",
+      headers: await authHeaders(false),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
+  async uploadCV(fileName: string, content: string) {
+    const response = await fetch(`${API_BASE_URL}/aura-life-coach/cv/upload`, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify({ file_name: fileName, content }),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
+  async analyzeCV() {
+    const response = await fetch(`${API_BASE_URL}/aura-life-coach/cv/analyze`, {
+      method: "POST",
+      headers: await authHeaders(false),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
+  async getCVFeedback() {
+    const response = await fetch(`${API_BASE_URL}/aura-life-coach/cv/feedback`, {
+      method: "GET",
+      headers: await authHeaders(false),
     });
     if (!response.ok) throw new Error(await response.text());
     return response.json();

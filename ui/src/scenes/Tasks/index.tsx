@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { ScrollView, StyleSheet, Text, View, Pressable } from "react-native";
+import React, { useEffect, useState } from "react";
+import { Alert, ScrollView, StyleSheet, Text, View, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { palette, commonStyles } from "../../theme";
 import { AppCard } from "../../components/AppCard";
@@ -8,10 +8,8 @@ import { ProgressBar } from "../../components/ProgressBar";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { SegmentedControl } from "../../components/SegmentedControl";
 import { PrimaryButton } from "../../components/PrimaryButton";
-import {
-  ongoingTasks,
-  completedTasks,
-} from "../../../src-native/mockData";
+import { InputField } from "../../components/InputField";
+import { api } from "../../api/api";
 
 function getPriorityColors(priority: "High" | "Medium" | "Low") {
   switch (priority) {
@@ -40,10 +38,44 @@ function getCategoryColor(category: string) {
 export function TasksScreen({ onNavigateCalendar }: { onNavigateCalendar: () => void }) {
   const [viewMode, setViewMode] = useState("List");
   const [listTab, setListTab] = useState("Today");
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [newTask, setNewTask] = useState("");
 
-  const todayTasks = ongoingTasks.filter((task) => task.status === "In Progress");
-  const upcomingTasks = ongoingTasks.filter((task) => task.status !== "In Progress");
-  const completed = completedTasks;
+  const loadTasks = async () => {
+    try {
+      const data = await api.getTasks();
+      if (!data?.length) {
+        await api.generateTaskPlan();
+        const generated = await api.getTasks();
+        setTasks(generated);
+        return;
+      }
+      setTasks(data);
+    } catch (error) {
+      Alert.alert("Task loading failed", (error as Error).message);
+    }
+  };
+
+  useEffect(() => {
+    loadTasks();
+  }, []);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const todayTasks = tasks.filter((task) => (task.start_date_time || "").slice(0, 10) <= today && (task.status || "").toLowerCase() !== "completed");
+  const upcomingTasks = tasks.filter((task) => (task.start_date_time || "").slice(0, 10) > today && (task.status || "").toLowerCase() !== "completed");
+  const completed = tasks.filter((task) => (task.status || "").toLowerCase() === "completed");
+
+  const addTask = async () => {
+    if (!newTask.trim()) return;
+    await api.addTask({ task: newTask.trim(), status: "pending" });
+    setNewTask("");
+    await loadTasks();
+  };
+
+  const moveTask = async (task: any, status: string) => {
+    await api.updateTask(task.id, { status });
+    await loadTasks();
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.screenContent}>
@@ -66,28 +98,32 @@ export function TasksScreen({ onNavigateCalendar }: { onNavigateCalendar: () => 
           <View style={commonStyles.stackMd}>
             {(listTab === "Today" ? todayTasks : listTab === "Upcoming" ? upcomingTasks : completed).map((task) => {
               const priority = getPriorityColors(task.priority as any);
-              const category = getCategoryColor(task.category);
+              const category = getCategoryColor(task.category || "Technical");
 
               return (
                 <AppCard key={task.id} style={commonStyles.stackMd}>
                   <View style={styles.cardHeaderSpace}>
                     <View style={commonStyles.flexOne}>
-                      <Text style={commonStyles.cardTitle}>{task.title}</Text>
-                      {task.description ? <Text style={commonStyles.cardBody}>{task.description}</Text> : null}
+                      <Text style={commonStyles.cardTitle}>{task.task}</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color={palette.muted} />
                   </View>
 
                   <View style={commonStyles.badgeRow}>
-                    <Badge label={task.category} backgroundColor={category.backgroundColor} textColor={category.textColor} />
-                    <Badge label={task.priority} backgroundColor={priority.backgroundColor} textColor={priority.textColor} />
+                    <Badge label={task.category || "Technical"} backgroundColor={category.backgroundColor} textColor={category.textColor} />
+                    <Badge label={task.priority || "Medium"} backgroundColor={priority.backgroundColor} textColor={priority.textColor} />
                   </View>
 
                   <View style={commonStyles.progressSummaryRow}>
                     <Text style={commonStyles.helperText}>{task.status}</Text>
-                    <Text style={commonStyles.helperText}>{task.dueLabel}</Text>
+                    <Text style={commonStyles.helperText}>{(task.end_date_time || task.start_date_time || "").slice(0, 10)}</Text>
                   </View>
-                  <ProgressBar value={task.progress} />
+                  <ProgressBar value={task.status === "completed" ? 100 : task.status === "in_progress" ? 60 : 15} />
+                  <View style={styles.inlineActions}>
+                    <PrimaryButton label="Todo" onPress={() => moveTask(task, "pending")} secondary />
+                    <PrimaryButton label="In progress" onPress={() => moveTask(task, "in_progress")} secondary />
+                    <PrimaryButton label="Done" onPress={() => moveTask(task, "completed")} secondary />
+                  </View>
                 </AppCard>
               );
             })}
@@ -106,8 +142,13 @@ export function TasksScreen({ onNavigateCalendar }: { onNavigateCalendar: () => 
                 <View style={commonStyles.stackSm}>
                   {column.items.map((task) => (
                     <AppCard key={task.id} style={styles.boardCard}>
-                      <Text style={commonStyles.cardTitle}>{task.title}</Text>
-                      <Text style={commonStyles.cardBody}>{task.dueLabel}</Text>
+                      <Text style={commonStyles.cardTitle}>{task.task}</Text>
+                      <Text style={commonStyles.cardBody}>{(task.start_date_time || "").slice(0, 10)}</Text>
+                      <View style={styles.inlineActions}>
+                        <PrimaryButton label="Todo" onPress={() => moveTask(task, "pending")} secondary />
+                        <PrimaryButton label="In progress" onPress={() => moveTask(task, "in_progress")} secondary />
+                        <PrimaryButton label="Done" onPress={() => moveTask(task, "completed")} secondary />
+                      </View>
                     </AppCard>
                   ))}
                 </View>
@@ -117,7 +158,10 @@ export function TasksScreen({ onNavigateCalendar }: { onNavigateCalendar: () => 
         </ScrollView>
       )}
 
-      <PrimaryButton label="Add New Task" onPress={() => undefined} />
+      <AppCard style={commonStyles.stackSm}>
+        <InputField label="New Task" placeholder="Add a task" value={newTask} onChangeText={setNewTask} />
+        <PrimaryButton label="Add New Task" onPress={addTask} />
+      </AppCard>
     </ScrollView>
   );
 }
@@ -161,5 +205,10 @@ const styles = StyleSheet.create({
   },
   boardCard: {
     gap: 6,
+  },
+  inlineActions: {
+    flexDirection: "row",
+    gap: 8,
+    flexWrap: "wrap",
   },
 });

@@ -27,10 +27,15 @@ export function OnboardingScreen({
   const [degreeProgram, setDegreeProgram] = useState(initialProfile.degreeProgram);
   const [studyYear, setStudyYear] = useState(initialProfile.studyYear);
   const [goal, setGoal] = useState(initialProfile.goal);
+  const [technicalSkillLevel, setTechnicalSkillLevel] = useState(initialProfile.technicalSkillLevel);
+  const [softSkillLevel, setSoftSkillLevel] = useState(initialProfile.softSkillLevel);
+  const [availabilityType, setAvailabilityType] = useState(initialProfile.availabilityType);
+  const [availabilityHours, setAvailabilityHours] = useState(initialProfile.availabilityHours);
 
   const progress = step === 1 ? 50 : 100;
-  const canContinue =
-    step === 1 ? Boolean(firstName && lastName && email) : Boolean(university && degreeProgram && studyYear && goal);
+  const canContinue = step === 1
+    ? Boolean(firstName && lastName && email)
+    : Boolean(university && degreeProgram && studyYear && goal && technicalSkillLevel && softSkillLevel && availabilityType && availabilityHours);
 
   return (
     <ScrollView contentContainerStyle={styles.screenContent}>
@@ -61,24 +66,31 @@ export function OnboardingScreen({
           </View>
         ) : (
           <View style={commonStyles.stackMd}>
-            <InputField label="University" placeholder="University of Technology" value={university} onChangeText={setUniversity} />
+            <PickerField label="University" selectedValue={university} onValueChange={(itemValue) => setUniversity(itemValue)}>
+              <Picker.Item label="Select University" value="" />
+              <Picker.Item label="Open University of Sri Lanka" value="Open University of Sri Lanka" />
+              <Picker.Item label="University of Colombo" value="University of Colombo" />
+              <Picker.Item label="University of Moratuwa" value="University of Moratuwa" />
+              <Picker.Item label="SLIIT" value="SLIIT" />
+            </PickerField>
             <PickerField
               label="Degree Program"
               selectedValue={degreeProgram}
               onValueChange={(itemValue) => setDegreeProgram(itemValue)}
             >
               <Picker.Item label="Select Degree Program" value="" />
-              <Picker.Item label="Software Engineering" value="software_engineering" />
-              <Picker.Item label="Computer Science" value="computer_science" />
-              <Picker.Item label="Information Technology" value="information_technology" />
+              <Picker.Item label="Software Engineering" value="Software Engineering" />
+              <Picker.Item label="Computer Science" value="Computer Science" />
+              <Picker.Item label="Information Technology" value="Information Technology" />
             </PickerField>
 
-            <InputField
-              label="Study Year"
-              placeholder="3rd Year"
-              value={studyYear}
-              onChangeText={setStudyYear}
-            />
+            <PickerField label="Study Year" selectedValue={studyYear} onValueChange={(itemValue) => setStudyYear(itemValue)}>
+              <Picker.Item label="Select Study Year" value="" />
+              <Picker.Item label="1st year" value="1" />
+              <Picker.Item label="2nd year" value="2" />
+              <Picker.Item label="3rd year" value="3" />
+              <Picker.Item label="4th year" value="4" />
+            </PickerField>
 
             <PickerField
               label="Your Goal"
@@ -86,10 +98,33 @@ export function OnboardingScreen({
               onValueChange={(itemValue) => setGoal(itemValue)}
             >
               <Picker.Item label="Select Goal" value="" />
-              <Picker.Item label="Software Engineer" value="software_engineer" />
-              <Picker.Item label="Backend Developer" value="backend_developer" />
-              <Picker.Item label="QA Engineer" value="qa_engineer" />
-              <Picker.Item label="DevOps Engineer" value="devops_engineer" />
+              <Picker.Item label="I wanted to be a software engineer" value="1" />
+              <Picker.Item label="I wanted to be a backend developer" value="2" />
+              <Picker.Item label="I wanted to be a QA engineer" value="3" />
+              <Picker.Item label="I wanted to be a DevOps engineer" value="4" />
+            </PickerField>
+            <PickerField label="Initial technical skill level" selectedValue={technicalSkillLevel} onValueChange={(itemValue) => setTechnicalSkillLevel(itemValue)}>
+              <Picker.Item label="Select level" value="" />
+              <Picker.Item label="Beginner" value="Beginner" />
+              <Picker.Item label="Intermediate" value="Intermediate" />
+              <Picker.Item label="Advanced" value="Advanced" />
+            </PickerField>
+            <PickerField label="Initial soft skill level" selectedValue={softSkillLevel} onValueChange={(itemValue) => setSoftSkillLevel(itemValue)}>
+              <Picker.Item label="Select level" value="" />
+              <Picker.Item label="Beginner" value="Beginner" />
+              <Picker.Item label="Intermediate" value="Intermediate" />
+              <Picker.Item label="Advanced" value="Advanced" />
+            </PickerField>
+            <PickerField label="Availability type" selectedValue={availabilityType} onValueChange={(itemValue) => setAvailabilityType(itemValue)}>
+              <Picker.Item label="Select type" value="" />
+              <Picker.Item label="Daily" value="daily" />
+              <Picker.Item label="Weekly" value="weekly" />
+            </PickerField>
+            <PickerField label="Time availability (hours)" selectedValue={availabilityHours} onValueChange={(itemValue) => setAvailabilityHours(itemValue)}>
+              <Picker.Item label="Select hours" value="" />
+              {Array.from({ length: 20 }, (_, i) => (
+                <Picker.Item key={i + 1} label={`${i + 1}`} value={`${i + 1}`} />
+              ))}
             </PickerField>
           </View>
         )}
@@ -110,9 +145,13 @@ export function OnboardingScreen({
                 email,
                 password: initialPassword,
                 university,
+                technical_skill_level: technicalSkillLevel,
+                soft_skill_level: softSkillLevel,
+                availability_type: availabilityType,
+                availability_hours: parseInt(availabilityHours) || 1,
                 degree_program: degreeProgram,
                 study_year: parseInt(studyYear) || 1,
-                goal_id: 1, // Defaulting for now
+                goal_id: parseInt(goal) || 1,
               });
             }}
             disabled={!canContinue}

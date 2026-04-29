@@ -7,6 +7,8 @@ import { ScreenHeader } from "../../components/ScreenHeader";
 import { Message } from "../../types";
 import { initialMessages } from "../../constants";
 import { quickPrompts } from "../../../src-native/mockData";
+import { PrimaryButton } from "../../components/PrimaryButton";
+import { api } from "../../api/api";
 
 function getAuraResponse(message: string) {
   const lower = message.toLowerCase();
@@ -54,6 +56,9 @@ export function AICoachScreen() {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [cvName, setCvName] = useState("");
+  const [cvContent, setCvContent] = useState("");
+  const [cvFeedback, setCvFeedback] = useState<string[]>([]);
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -93,6 +98,20 @@ export function AICoachScreen() {
     }, 900);
   };
 
+  const analyzeCV = async () => {
+    if (!cvName.trim() || !cvContent.trim()) {
+      return;
+    }
+    try {
+      await api.uploadCV(cvName.trim(), cvContent.trim());
+      await api.analyzeCV();
+      const feedback = await api.getCVFeedback();
+      setCvFeedback(feedback.feedback || []);
+    } catch (error) {
+      setCvFeedback([`CV analysis failed: ${(error as Error).message}`]);
+    }
+  };
+
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={commonStyles.flexOne}>
       <ScreenHeader title="AURA Life Coach" subtitle="Ask about study, career, or technical growth" />
@@ -112,6 +131,29 @@ export function AICoachScreen() {
       </ScrollView>
 
       <ScrollView ref={scrollRef} contentContainerStyle={styles.chatBody}>
+        <View style={styles.cvCard}>
+          <Text style={styles.cvTitle}>CV status</Text>
+          <TextInput
+            value={cvName}
+            onChangeText={setCvName}
+            placeholder="CV file name (example: my_cv.txt)"
+            placeholderTextColor={palette.muted}
+            style={styles.cvInput}
+          />
+          <TextInput
+            value={cvContent}
+            onChangeText={setCvContent}
+            placeholder="Paste CV content for analysis"
+            placeholderTextColor={palette.muted}
+            style={[styles.cvInput, styles.cvInputMultiline]}
+            multiline
+          />
+          <PrimaryButton label="Upload & Analyze CV" onPress={analyzeCV} />
+          {cvFeedback.map((line, index) => (
+            <Text key={index} style={styles.cvFeedback}>{`\u2022 ${line}`}</Text>
+          ))}
+        </View>
+
         {messages.map((message) => {
           const isUser = message.type === "user";
           return (
@@ -272,5 +314,35 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: palette.primary,
+  },
+  cvCard: {
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surface,
+    borderRadius: 16,
+    padding: 12,
+    gap: 8,
+  },
+  cvTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: palette.text,
+  },
+  cvInput: {
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    color: palette.text,
+    backgroundColor: "#F8FBFF",
+  },
+  cvInputMultiline: {
+    minHeight: 84,
+    textAlignVertical: "top",
+  },
+  cvFeedback: {
+    color: palette.muted,
+    lineHeight: 20,
   },
 });

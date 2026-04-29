@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { palette, commonStyles } from "../../theme";
@@ -11,8 +11,9 @@ import { UserProfile, Route } from "../../types";
 import {
   dashboardStats,
   todayPlan,
-  ongoingTasks,
+  recommendations,
 } from "../../../src-native/mockData";
+import { api } from "../../api/api";
 
 function formatToday() {
   return new Date().toLocaleDateString("en-US", {
@@ -55,6 +56,12 @@ export function DashboardScreen({
   onNavigate: (route: Route) => void;
   onSignOut: () => void;
 }) {
+  const [tasks, setTasks] = useState<any[]>([]);
+
+  useEffect(() => {
+    api.getTasks().then(setTasks).catch(() => undefined);
+  }, []);
+
   return (
     <ScrollView contentContainerStyle={styles.screenContent}>
       <ScreenHeader
@@ -73,7 +80,7 @@ export function DashboardScreen({
       />
 
       <View style={styles.statsRow}>
-        {dashboardStats.map((item) => (
+        {dashboardStats.filter((item) => item.label !== "Active Goals").map((item) => (
           <AppCard key={item.label} style={styles.metricCard}>
             <Ionicons name={item.icon as any} size={24} color={item.color} />
             <Text style={styles.metricValue}>{item.value}</Text>
@@ -83,6 +90,11 @@ export function DashboardScreen({
       </View>
 
       <View style={commonStyles.stackMd}>
+        <AppCard style={commonStyles.stackSm}>
+          <Text style={styles.sectionTitle}>Current career goal</Text>
+          <Text style={commonStyles.cardBodyStrong}>{user.goal}</Text>
+        </AppCard>
+
         <AppCard style={styles.primaryBanner}>
           <Text style={styles.bannerEyebrow}>AURA says...</Text>
           <Text style={styles.bannerBody}>
@@ -117,7 +129,21 @@ export function DashboardScreen({
               </View>
               <Ionicons name="chevron-forward" size={18} color={palette.muted} />
             </Pressable>
+            <View style={styles.quickButtonRow}>
+              <Pressable style={styles.quickButton} onPress={() => onNavigate("aiCoach")}>
+                <Text style={styles.quickButtonText}>Go to Chat</Text>
+              </Pressable>
+              <Pressable style={styles.quickButton} onPress={() => onNavigate("tasks")}>
+                <Text style={styles.quickButtonText}>View Tasks</Text>
+              </Pressable>
+            </View>
           </View>
+        </AppCard>
+
+        <AppCard style={commonStyles.stackMd}>
+          <Text style={styles.sectionTitle}>AURA recommendations</Text>
+          <Text style={commonStyles.cardBodyStrong}>{recommendations[0]?.title}</Text>
+          <Text style={commonStyles.cardBody}>{recommendations[0]?.reason}</Text>
         </AppCard>
 
         <AppCard style={commonStyles.stackMd}>
@@ -143,30 +169,30 @@ export function DashboardScreen({
           <TextLink label="Open planner" onPress={() => onNavigate("tasks")} />
         </View>
 
-        {ongoingTasks.map((task) => {
+        {tasks.slice(0, 5).map((task) => {
           const priority = getPriorityColors(task.priority as any);
-          const category = getCategoryColor(task.category);
+          const category = getCategoryColor(task.category || "Technical");
 
           return (
             <AppCard key={task.id} style={commonStyles.stackMd}>
               <View style={styles.cardHeaderSpace}>
                 <View style={commonStyles.flexOne}>
-                  <Text style={commonStyles.cardTitle}>{task.title}</Text>
-                  <Text style={commonStyles.cardBody}>{task.description}</Text>
+                  <Text style={commonStyles.cardTitle}>{task.task}</Text>
+                  <Text style={commonStyles.cardBody}>{task.status}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={palette.muted} />
               </View>
 
               <View style={commonStyles.badgeRow}>
-                <Badge label={task.category} backgroundColor={category.backgroundColor} textColor={category.textColor} />
-                <Badge label={task.priority} backgroundColor={priority.backgroundColor} textColor={priority.textColor} />
+                <Badge label={task.category || "Technical"} backgroundColor={category.backgroundColor} textColor={category.textColor} />
+                <Badge label={task.priority || "Medium"} backgroundColor={priority.backgroundColor} textColor={priority.textColor} />
               </View>
 
               <View style={commonStyles.progressSummaryRow}>
-                <Text style={commonStyles.helperText}>Progress {task.progress}%</Text>
-                <Text style={commonStyles.helperText}>{task.dueLabel}</Text>
+                <Text style={commonStyles.helperText}>{task.status}</Text>
+                <Text style={commonStyles.helperText}>{(task.end_date_time || task.start_date_time || "").slice(0, 10)}</Text>
               </View>
-              <ProgressBar value={task.progress} />
+              <ProgressBar value={task.status === "completed" ? 100 : task.status === "in_progress" ? 60 : 15} />
             </AppCard>
           );
         })}
@@ -273,6 +299,22 @@ const styles = StyleSheet.create({
   quickActionSubtitle: {
     color: palette.muted,
     marginTop: 2,
+  },
+  quickButtonRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 6,
+  },
+  quickButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: "center",
+    backgroundColor: palette.primary,
+  },
+  quickButtonText: {
+    color: palette.surface,
+    fontWeight: "700",
   },
   timelineRow: {
     flexDirection: "row",
