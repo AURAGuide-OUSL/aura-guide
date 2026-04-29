@@ -9,14 +9,18 @@ import (
 )
 
 type AuthRequest struct {
-	Email         string `json:"email"`
-	Password      string `json:"password"`
-	FirstName     string `json:"first_name"`
-	LastName      string `json:"last_name"`
-	DegreeProgram string `json:"degree_program"`
-	University    string `json:"university"`
-	GoalID        int    `json:"goal_id"`
-	StudyYear     int    `json:"study_year"`
+	Email               string `json:"email"`
+	Password            string `json:"password"`
+	FirstName           string `json:"first_name"`
+	LastName            string `json:"last_name"`
+	DegreeProgram       string `json:"degree_program"`
+	University          string `json:"university"`
+	TechnicalSkillLevel string `json:"technical_skill_level"`
+	SoftSkillLevel      string `json:"soft_skill_level"`
+	AvailabilityType    string `json:"availability_type"`
+	AvailabilityHours   int    `json:"availability_hours"`
+	GoalID              int    `json:"goal_id"`
+	StudyYear           int    `json:"study_year"`
 }
 
 func RegisterHandlers(mux http.Handler) {
@@ -29,7 +33,21 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := service.Signup(r.Context(), req.Email, req.Password, req.FirstName, req.LastName, req.DegreeProgram, req.University, req.GoalID, req.StudyYear); err != nil {
+	if err := service.Signup(
+		r.Context(),
+		req.Email,
+		req.Password,
+		req.FirstName,
+		req.LastName,
+		req.DegreeProgram,
+		req.University,
+		req.TechnicalSkillLevel,
+		req.SoftSkillLevel,
+		req.AvailabilityType,
+		req.AvailabilityHours,
+		req.GoalID,
+		req.StudyYear,
+	); err != nil {
 		http.Error(w, "Error creating user: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

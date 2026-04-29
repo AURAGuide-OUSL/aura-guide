@@ -45,6 +45,10 @@ CREATE TABLE user_student (
    degree_program VARCHAR(255),
    study_year INT,
    university VARCHAR(255),
+   technical_skill_level VARCHAR(32),
+   soft_skill_level VARCHAR(32),
+   availability_type VARCHAR(16),
+   availability_hours INT,
    current_score INT DEFAULT 0,
    recommendation TEXT
 );

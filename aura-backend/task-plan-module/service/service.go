@@ -46,6 +46,10 @@ func GetTasksForDate(ctx context.Context, email string, date time.Time) ([]taskp
 	return dao.GetTasksForDate(ctx, email, date)
 }
 
+func AddTask(ctx context.Context, email string, req taskplan.AddTaskRequest) (*taskplan.Task, error) {
+	return dao.AddTask(ctx, email, req)
+}
+
 func ParseTaskID(value string) (int, error) {
 	return strconv.Atoi(value)
 }

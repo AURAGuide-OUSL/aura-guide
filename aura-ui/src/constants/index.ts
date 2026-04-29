@@ -9,7 +9,16 @@ export const initialProfile: UserProfile = {
   university: "",
   degreeProgram: "",
   studyYear: "",
+  technicalSkillLevel: "",
+  softSkillLevel: "",
+  availabilityType: "",
+  availabilityHours: "",
   goal: "",
+  goalId: undefined,
+  technicalScore: 0,
+  softSkillScore: 0,
+  currentScore: 0,
+  recommendation: "",
   joinedDate: "",
 };
 

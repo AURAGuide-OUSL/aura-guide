@@ -13,13 +13,31 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func Signup(ctx context.Context, email, password, firstName, lastName, degreeProgram, university string, goalID, studyYear int) error {
+func Signup(
+	ctx context.Context,
+	email, password, firstName, lastName, degreeProgram, university, technicalSkillLevel, softSkillLevel, availabilityType string,
+	availabilityHours, goalID, studyYear int,
+) error {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
 
-	_, err = dao.CreateUser(ctx, email, string(hashedPassword), firstName, lastName, degreeProgram, university, goalID, studyYear)
+	_, err = dao.CreateUser(
+		ctx,
+		email,
+		string(hashedPassword),
+		firstName,
+		lastName,
+		degreeProgram,
+		university,
+		technicalSkillLevel,
+		softSkillLevel,
+		availabilityType,
+		availabilityHours,
+		goalID,
+		studyYear,
+	)
 	return err
 }
 

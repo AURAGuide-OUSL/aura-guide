@@ -24,8 +24,17 @@ export type UserProfile = {
   university: string;
   degreeProgram: string;
   studyYear: string;
+  technicalSkillLevel: string;
+  softSkillLevel: string;
+  availabilityType: string;
+  availabilityHours: string;
   joinedDate: string;
   goal: string;
+  goalId?: number;
+  technicalScore?: number;
+  softSkillScore?: number;
+  currentScore?: number;
+  recommendation?: string;
 };
 
 export type Message = {

@@ -132,6 +132,34 @@ func DeleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"message": "Task deleted successfully"})
 }
 
+func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
+	email, ok := r.Context().Value(middleware.UserEmailKey).(string)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req taskplan.AddTaskRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.Task == "" {
+		http.Error(w, "task is required", http.StatusBadRequest)
+		return
+	}
+
+	task, err := service.AddTask(r.Context(), email, req)
+	if err != nil {
+		http.Error(w, "Error creating task", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(task)
+}
+
 func GetTasksForDateHandler(w http.ResponseWriter, r *http.Request) {
 	email, ok := r.Context().Value(middleware.UserEmailKey).(string)
 	if !ok {

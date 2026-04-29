@@ -33,3 +33,11 @@ type UpdateTaskRequest struct {
 	StartDateTime *time.Time `json:"start_date_time"`
 	EndDateTime   *time.Time `json:"end_date_time"`
 }
+
+type AddTaskRequest struct {
+	Task          string     `json:"task"`
+	Status        string     `json:"status"`
+	SkillID       *int       `json:"skill_id"`
+	StartDateTime *time.Time `json:"start_date_time"`
+	EndDateTime   *time.Time `json:"end_date_time"`
+}

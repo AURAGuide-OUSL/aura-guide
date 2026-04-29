@@ -204,6 +204,51 @@ func DeleteTask(ctx context.Context, email string, taskID int) error {
 	return err
 }
 
+func AddTask(ctx context.Context, email string, req taskplan.AddTaskRequest) (*taskplan.Task, error) {
+	userCtx, err := getUserContext(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+
+	statusName := req.Status
+	if statusName == "" {
+		statusName = "pending"
+	}
+	statusID, err := getStatusID(ctx, statusName)
+	if err != nil {
+		return nil, err
+	}
+
+	start := req.StartDateTime
+	if start == nil {
+		now := time.Now().UTC()
+		start = &now
+	}
+
+	var id int
+	err = db.Pool.QueryRow(ctx, `INSERT INTO user_custom_tasks (skill_id, user_id, task, start_date_time, end_date_time, status_id)
+		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+		req.SkillID, userCtx.UserID, req.Task, start, req.EndDateTime, statusID,
+	).Scan(&id)
+	if err != nil {
+		return nil, err
+	}
+
+	record, err := getTaskRecord(ctx, email, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &taskplan.Task{
+		ID:            record.ID,
+		SkillID:       record.SkillID,
+		Task:          record.Task,
+		Status:        statusName,
+		StartDateTime: record.StartDateTime,
+		EndDateTime:   record.EndDateTime,
+	}, nil
+}
+
 func getUserContext(ctx context.Context, email string) (*userContext, error) {
 	var userCtx userContext
 	if err := db.Pool.QueryRow(ctx, `SELECT id, goal_id, COALESCE(current_score, 0) FROM user_student WHERE email = $1`, email).Scan(&userCtx.UserID, &userCtx.GoalID, &userCtx.CurrentScore); err != nil {

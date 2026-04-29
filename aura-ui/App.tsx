@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -30,31 +30,45 @@ import { TermsScreen } from "./src/scenes/Terms";
 
 import { api } from "./src/api/api";
 
+const goalIdToLabel: Record<number, string> = {
+  1: "I wanted to be a software engineer",
+  2: "I wanted to be a backend developer",
+  3: "I wanted to be a QA engineer",
+  4: "I wanted to be a DevOps engineer",
+};
+
 export default function App() {
   const [route, setRoute] = useState<Route>("splash");
   const [tab, setTab] = useState<TabRoute>("dashboard");
   const [user, setUser] = useState<UserProfile>(initialProfile);
   const [tempPassword, setTempPassword] = useState("");
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [notifications, setNotifications] = useState(notificationSeed);
   const [settings, setSettings] = useState({
     notifications: true,
     darkMode: false,
     language: "English (US)",
   });
+  const [termsBackRoute, setTermsBackRoute] = useState<Route>("signup");
 
   const fetchProfile = async () => {
     try {
       const profileData = await api.getUserProfile();
+      const score = await api.getSkillScore().catch(() => ({ current_score: 0 }));
       // Map backend fields to frontend UserProfile
       setUser({
-        firstName: profileData.first_name,
-        lastName: profileData.last_name,
+        firstName: profileData.first_name || "",
+        lastName: profileData.last_name || "",
         email: profileData.email,
-        university: profileData.university,
-        degreeProgram: profileData.degree_program,
-        studyYear: profileData.study_year.toString(),
-        goal: profileData.goal_id === 1 ? "Software Engineer" : "Developer",
+        university: profileData.university || "",
+        degreeProgram: profileData.degree_program || "",
+        studyYear: profileData.study_year ? String(profileData.study_year) : "",
+        technicalSkillLevel: profileData.technical_skill_level || "",
+        softSkillLevel: profileData.soft_skill_level || "",
+        availabilityType: profileData.availability_type || "",
+        availabilityHours: profileData.availability_hours ? String(profileData.availability_hours) : "",
+        goal: goalIdToLabel[profileData.goal_id || 1] || "I wanted to be a software engineer",
+        goalId: profileData.goal_id || 1,
+        currentScore: score.current_score || 0,
         joinedDate: initialProfile.joinedDate,
       });
       return true;
@@ -71,7 +85,6 @@ export default function App() {
       } else {
         setRoute("signin");
       }
-      setIsCheckingAuth(false);
     };
 
     const timer = setTimeout(checkAuth, 2000); // Keep splash for a bit
@@ -117,6 +130,7 @@ export default function App() {
   };
 
   const activeRoute = tabRoutes.includes(route as any) ? tab : route;
+  const appBg = settings.darkMode ? "#0B1220" : palette.background;
 
   const renderContent = () => {
     switch (activeRoute) {
@@ -133,7 +147,10 @@ export default function App() {
       case "signup":
         return (
           <SignUpScreen
-            onOpenTerms={() => setRoute("terms")}
+            onOpenTerms={() => {
+              setTermsBackRoute("signup");
+              setRoute("terms");
+            }}
             onOpenSignIn={() => setRoute("signin")}
             onContinue={handleSignUp}
           />
@@ -153,13 +170,24 @@ export default function App() {
       case "goals":
         return <GoalsScreen />;
       case "profile":
-        return <ProfileScreen user={user} onNavigateSettings={() => setRoute("settings")} />;
+        return (
+          <ProfileScreen
+            user={user}
+            onNavigateSettings={() => setRoute("settings")}
+            onProfileUpdated={async () => {
+              await fetchProfile();
+            }}
+          />
+        );
       case "settings":
         return (
           <SettingsScreen
             values={settings}
             onChange={setSettings}
-            onOpenTerms={() => setRoute("terms")}
+            onOpenTerms={() => {
+              setTermsBackRoute("settings");
+              setRoute("terms");
+            }}
             onBack={() => setRoute("profile")}
             onSignOut={handleSignOut}
           />
@@ -177,7 +205,7 @@ export default function App() {
       case "careerTrack":
         return <CareerTrackScreen onBack={() => setRoute("dashboard")} />;
       case "terms":
-        return <TermsScreen onBack={() => setRoute("signup")} />;
+        return <TermsScreen onBack={() => setRoute(termsBackRoute)} />;
       default:
         return null;
     }
@@ -189,7 +217,7 @@ export default function App() {
     <SafeAreaProvider>
       <View style={styles.container}>
         <StatusBar style="dark" />
-        <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: appBg }]} edges={["top", "left", "right"]}>
           {renderContent()}
         </SafeAreaView>
         {showTabs && <BottomTabs current={tab} onNavigate={(route: TabRoute) => setTab(route)} />}
