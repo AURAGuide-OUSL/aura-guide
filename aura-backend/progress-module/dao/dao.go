@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"aura-backend/common/db"
+	"aura-backend/common/skillsmetrics"
 	progress "aura-backend/progress-module"
 	taskdao "aura-backend/task-plan-module/dao"
 	"github.com/jackc/pgx/v5"
@@ -74,13 +75,21 @@ func GetDashboardSummary(ctx context.Context, email string) (*progress.Dashboard
 	var summary progress.DashboardSummary
 	var userID int
 
-	err := db.Pool.QueryRow(ctx, `SELECT u.id, COALESCE(u.first_name, ''), COALESCE(u.last_name, ''), COALESCE(u.current_score, 0), COALESCE(g.name, '')
+	err := db.Pool.QueryRow(ctx, `SELECT u.id, COALESCE(u.first_name, ''), COALESCE(u.last_name, ''), COALESCE(g.name, '')
 		FROM user_student u
 		LEFT JOIN goals g ON g.id = u.goal_id
-		WHERE u.email = $1`, email).Scan(&userID, &summary.FirstName, &summary.LastName, &summary.CurrentScore, &summary.CareerTitle)
+		WHERE u.email = $1`, email).Scan(&userID, &summary.FirstName, &summary.LastName, &summary.CareerTitle)
 	if err != nil {
 		return nil, err
 	}
+
+	am, err := skillsmetrics.ForUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	summary.CurrentScore = am.Percent
+	summary.SkillAverage = am.Average
+	summary.SkillReadinessLabel = am.ReadinessLabel
 
 	dayStreak, err := upsertAndGetDayStreak(ctx, userID)
 	if err != nil {
@@ -97,9 +106,14 @@ func GetDashboardSummary(ctx context.Context, email string) (*progress.Dashboard
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	todayEnd := todayStart.Add(24 * time.Hour)
 
+	completedCnt, err := taskdao.CountCompletedTasks(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	summary.CompletedTasks = completedCnt
+
 	for _, task := range tasks {
 		if strings.EqualFold(task.Status, "completed") {
-			summary.CompletedTasks++
 			continue
 		}
 

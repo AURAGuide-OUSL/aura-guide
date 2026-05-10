@@ -34,6 +34,7 @@ export type UserProfile = {
   technicalScore?: number;
   softSkillScore?: number;
   currentScore?: number;
+  skillReadinessLabel?: string;
   recommendation?: string;
 };
 
@@ -41,6 +42,7 @@ export type Message = {
   id: number;
   type: "user" | "aura";
   content: string;
-  timestamp: string;
+  /** Omit when restoring history (DB has no per-message time). */
+  timestamp?: string;
   category?: string;
 };

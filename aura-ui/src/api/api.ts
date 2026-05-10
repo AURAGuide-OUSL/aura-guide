@@ -1,6 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from "react-native";
 
-const API_BASE_URL = "http://localhost:8080"; // local IP if testing on a device
+import { CONFIG } from "../config";
+
+const API_BASE_URL = CONFIG.API_BASE_URL;
 
 async function authHeaders(contentType = true) {
   const token = await AsyncStorage.getItem("auth_token");
@@ -142,13 +145,24 @@ export const api = {
     if (!response.ok) throw new Error(await response.text());
     return response.json();
   },
+  /** Deletes custom or agent task in one shot (backend resolves the correct table). */
   async deleteTask(taskId: number) {
-    const response = await fetch(`${API_BASE_URL}/task-plan/tasks/${taskId}`, {
+    const id = Number(taskId);
+    if (!Number.isFinite(id) || id < 1) {
+      throw new Error("Invalid task id");
+    }
+    const response = await fetch(`${API_BASE_URL}/task-plan/tasks/${id}`, {
       method: "DELETE",
       headers: await authHeaders(false),
     });
     if (!response.ok) throw new Error(await response.text());
-    return response.json();
+    const raw = await response.text();
+    if (!raw?.trim()) return {};
+    try {
+      return JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return { message: raw };
+    }
   },
   async uploadCV(fileName: string, content: string) {
     const response = await fetch(`${API_BASE_URL}/aura-life-coach/cv/upload`, {
@@ -254,6 +268,226 @@ export const api = {
     });
     if (!response.ok) throw new Error(await response.text());
     return response.json();
+  },
+
+  /** AI Coach - Ollama via Python agent (Bearer JWT). */
+  async agentChat(message: string, sessionId?: number | null, topicFlow?: "reflection" | "communication" | null) {
+    const response = await fetch(`${CONFIG.AI_AGENT_BASE_URL}/agent/chat`, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify({
+        message,
+        ...(sessionId != null ? { session_id: sessionId } : {}),
+        ...(topicFlow ? { topic_flow: topicFlow } : {}),
+      }),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json() as Promise<{
+      reply: string;
+      session_id: number;
+      follow_up?: string | null;
+    }>;
+  },
+
+  async agentReflectionQuestion(
+    questionNumber: number,
+    opts?: { sessionId?: number | null; chatUserMessage?: string },
+  ) {
+    const response = await fetch(`${CONFIG.AI_AGENT_BASE_URL}/agent/reflection/next-question`, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify({
+        question_number: questionNumber,
+        ...(opts?.sessionId != null ? { session_id: opts.sessionId } : {}),
+        ...(opts?.chatUserMessage ? { chat_user_message: opts.chatUserMessage } : {}),
+      }),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json() as Promise<{
+      type: string;
+      question_number: number;
+      question: string;
+      session_id: number;
+    }>;
+  },
+
+  async agentReflectionEvaluate(
+    questionNumber: number,
+    question: string,
+    answer: string,
+    sessionId?: number | null,
+  ) {
+    const response = await fetch(`${CONFIG.AI_AGENT_BASE_URL}/agent/reflection/evaluate`, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify({
+        question_number: questionNumber,
+        question,
+        answer,
+        ...(sessionId != null ? { session_id: sessionId } : {}),
+      }),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json() as Promise<{
+      score: number;
+      feedback: string;
+      question_number: number;
+      session_id: number;
+    }>;
+  },
+
+  async uploadCVPdf(asset: { uri: string; name: string; mimeType?: string }) {
+    const token = await AsyncStorage.getItem("auth_token");
+    if (!token) throw new Error("No auth token found");
+    const form = new FormData();
+    const rawName = (asset.name || "cv.pdf").trim();
+    const fileName = rawName.toLowerCase().endsWith(".pdf") ? rawName : `${rawName.replace(/\.[^.]+$/, "") || "cv"}.pdf`;
+    const pdfType =
+      asset.mimeType && asset.mimeType.toLowerCase().includes("pdf") ? asset.mimeType : "application/pdf";
+
+    if (Platform.OS === "web") {
+      const res = await fetch(asset.uri);
+      const buf = await res.arrayBuffer();
+      const blob = new Blob([buf], { type: pdfType });
+      if (typeof File !== "undefined") {
+        const fileObj = new File([blob], fileName, { type: pdfType });
+        form.append("file", fileObj);
+      } else {
+        form.append("file", blob, fileName);
+      }
+    } else {
+      form.append(
+        "file",
+        {
+          uri: asset.uri,
+          name: fileName,
+          type: pdfType,
+        } as any,
+      );
+    }
+    const response = await fetch(`${API_BASE_URL}/aura-life-coach/cv/upload-pdf`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+      ...(Platform.OS === "web" ? { credentials: "include" as RequestCredentials } : {}),
+      body: form,
+    });
+    if (!response.ok) {
+      let msg = await response.text();
+      try {
+        const j = JSON.parse(msg);
+        if (j?.error) msg = j.error;
+      } catch {
+        /* plain text */
+      }
+      throw new Error(msg || "Upload failed");
+    }
+    return response.json() as Promise<{
+      strengths: string[];
+      weaknesses: string[];
+      improvements: string[];
+      chat_summary?: string;
+    }>;
+  },
+
+  async agentInterviewQuestion(
+    questionNumber: number,
+    opts?: { sessionId?: number | null; chatUserMessage?: string },
+  ) {
+    const response = await fetch(`${CONFIG.AI_AGENT_BASE_URL}/agent/interview/next-question`, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify({
+        question_number: questionNumber,
+        ...(opts?.sessionId != null ? { session_id: opts.sessionId } : {}),
+        ...(opts?.chatUserMessage ? { chat_user_message: opts.chatUserMessage } : {}),
+      }),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json() as Promise<{
+      type: string;
+      question_number: number;
+      question: string;
+      session_id: number;
+    }>;
+  },
+
+  async agentInterviewEvaluate(
+    questionNumber: number,
+    question: string,
+    answer: string,
+    sessionId?: number | null,
+  ) {
+    const response = await fetch(`${CONFIG.AI_AGENT_BASE_URL}/agent/interview/evaluate`, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify({
+        question_number: questionNumber,
+        question,
+        answer,
+        ...(sessionId != null ? { session_id: sessionId } : {}),
+      }),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json() as Promise<{
+      score: number;
+      feedback: string;
+      question_number: number;
+      session_id: number;
+    }>;
+  },
+
+  async agentTaskGenerate(opts?: { sessionId?: number | null; chatUserMessage?: string }) {
+    const response = await fetch(`${CONFIG.AI_AGENT_BASE_URL}/agent/task/generate`, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify({
+        ...(opts?.sessionId != null ? { session_id: opts.sessionId } : {}),
+        ...(opts?.chatUserMessage ? { chat_user_message: opts.chatUserMessage } : {}),
+      }),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json() as Promise<{
+      user_common_task_id: number;
+      task: string;
+      skill: string;
+      chat_message: string;
+      start_time: string;
+      end_time: string;
+      session_id: number;
+    }>;
+  },
+
+  async agentTaskEvaluate(body: {
+    user_common_task_id: number;
+    task_description: string;
+    skill: string;
+    answer: string;
+    session_id?: number | null;
+  }) {
+    const response = await fetch(`${CONFIG.AI_AGENT_BASE_URL}/agent/task/evaluate`, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json() as Promise<{ feedback_message: string; score: number; skill: string; session_id: number }>;
+  },
+
+  async getAgentChatHistory(sessionId?: number) {
+    const q =
+      sessionId != null ? `?session_id=${encodeURIComponent(String(sessionId))}` : "";
+    const response = await fetch(`${CONFIG.AI_AGENT_BASE_URL}/agent/chat/history${q}`, {
+      method: "GET",
+      headers: await authHeaders(false),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json() as Promise<{
+      session_id: number | null;
+      messages: { id: number; content: string; role: string }[];
+    }>;
   },
 
   /**

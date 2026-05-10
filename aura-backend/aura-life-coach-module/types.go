@@ -8,8 +8,11 @@ type QuestionSet struct {
 }
 
 type FeedbackResponse struct {
-	Topic    string   `json:"topic"`
-	Feedback []string `json:"feedback"`
+	Topic        string   `json:"topic"`
+	Feedback     []string `json:"feedback,omitempty"`
+	Strengths    []string `json:"strengths,omitempty"`
+	Weaknesses   []string `json:"weaknesses,omitempty"`
+	Improvements []string `json:"improvements,omitempty"`
 }
 
 type CVUploadRequest struct {

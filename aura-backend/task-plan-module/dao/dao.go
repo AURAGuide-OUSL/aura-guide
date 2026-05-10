@@ -2,12 +2,17 @@ package dao
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"aura-backend/common/db"
+	"aura-backend/common/skillsmetrics"
 	taskplan "aura-backend/task-plan-module"
 )
+
+// ErrTaskNotFound indicates no matching task row for this user.
+var ErrTaskNotFound = errors.New("task not found")
 
 type userContext struct {
 	UserID       int
@@ -44,11 +49,19 @@ func GetCareerPath(ctx context.Context, email string) (*taskplan.CareerPathRespo
 }
 
 func GetSkillScore(ctx context.Context, email string) (*taskplan.SkillScoreResponse, error) {
-	var score int
-	if err := db.Pool.QueryRow(ctx, `SELECT COALESCE(current_score, 0) FROM user_student WHERE email = $1`, email).Scan(&score); err != nil {
+	userCtx, err := getUserContext(ctx, email)
+	if err != nil {
 		return nil, err
 	}
-	return &taskplan.SkillScoreResponse{CurrentScore: score, SkillLevel: deriveSkillLevel(score)}, nil
+	m, err := skillsmetrics.ForUser(ctx, userCtx.UserID)
+	if err != nil {
+		return nil, err
+	}
+	return &taskplan.SkillScoreResponse{
+		CurrentScore: m.Percent,
+		SkillLevel:   m.ReadinessLabel,
+		SkillAverage: m.Average,
+	}, nil
 }
 
 func GeneratePlan(ctx context.Context, email string) ([]taskplan.Task, error) {
@@ -97,11 +110,30 @@ func GetTaskPlan(ctx context.Context, email string) ([]taskplan.Task, error) {
 		return nil, err
 	}
 
-	rows, err := db.Pool.Query(ctx, `SELECT uct.id, uct.skill_id, uct.task, COALESCE(s.name, 'pending'), uct.start_date_time, uct.end_date_time
-		FROM user_custom_tasks uct
-		LEFT JOIN status s ON s.id = uct.status_id
-		WHERE uct.user_id = $1
-		ORDER BY uct.start_date_time NULLS LAST, uct.id`, userCtx.UserID)
+	q := `
+SELECT id, task_origin, skill_id, skill_name, task_text, status_name, start_date_time, end_date_time FROM (
+	SELECT uct.id, 'custom'::text AS task_origin, uct.skill_id,
+		COALESCE(sk.name, '') AS skill_name,
+		uct.task AS task_text,
+		COALESCE(st.name, 'pending') AS status_name, uct.start_date_time, uct.end_date_time
+	FROM user_custom_tasks uct
+	LEFT JOIN status st ON st.id = uct.status_id
+	LEFT JOIN skills sk ON sk.id = uct.skill_id
+	WHERE uct.user_id = $1
+	UNION ALL
+	SELECT ucm.id, 'agent'::text AS task_origin, ct.skill_id,
+		COALESCE(sk2.name, '') AS skill_name,
+		ct.task AS task_text,
+		COALESCE(st2.name, 'pending') AS status_name, ucm.start_date_time, ucm.end_date_time
+	FROM user_common_tasks ucm
+	JOIN common_tasks ct ON ct.id = ucm.common_task_id
+	LEFT JOIN status st2 ON st2.id = ucm.status_id
+	LEFT JOIN skills sk2 ON sk2.id = ct.skill_id
+	WHERE ucm.user_id = $1
+) x
+ORDER BY start_date_time NULLS LAST, id`
+
+	rows, err := db.Pool.Query(ctx, q, userCtx.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -110,10 +142,10 @@ func GetTaskPlan(ctx context.Context, email string) ([]taskplan.Task, error) {
 	var tasks []taskplan.Task
 	for rows.Next() {
 		var task taskplan.Task
-		if err := rows.Scan(&task.ID, &task.SkillID, &task.Task, &task.Status, &task.StartDateTime, &task.EndDateTime); err != nil {
+		if err := rows.Scan(&task.ID, &task.TaskOrigin, &task.SkillID, &task.SkillName, &task.Task, &task.Status, &task.StartDateTime, &task.EndDateTime); err != nil {
 			return nil, err
 		}
-		task.IsCustom = task.SkillID == nil
+		task.IsCustom = task.TaskOrigin == "custom" && task.SkillID == nil
 		tasks = append(tasks, task)
 	}
 	return tasks, rows.Err()
@@ -199,13 +231,50 @@ func CompleteTask(ctx context.Context, email string, taskID int) error {
 	return err
 }
 
+// DeleteTask removes a row from user_custom_tasks or, if no match, user_common_tasks
+// (IDs can collide across tables, but deleting by user-owned row is correct for merged task lists).
 func DeleteTask(ctx context.Context, email string, taskID int) error {
 	userCtx, err := getUserContext(ctx, email)
 	if err != nil {
 		return err
 	}
-	_, err = db.Pool.Exec(ctx, `DELETE FROM user_custom_tasks WHERE id = $1 AND user_id = $2`, taskID, userCtx.UserID)
-	return err
+	ct, err := db.Pool.Exec(ctx, `DELETE FROM user_custom_tasks WHERE id = $1 AND user_id = $2`, taskID, userCtx.UserID)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() > 0 {
+		return nil
+	}
+	at, err := db.Pool.Exec(ctx, `DELETE FROM user_common_tasks WHERE id = $1 AND user_id = $2`, taskID, userCtx.UserID)
+	if err != nil {
+		return err
+	}
+	if at.RowsAffected() == 0 {
+		return ErrTaskNotFound
+	}
+	return nil
+}
+
+// CountCompletedTasks returns rows in user_custom_tasks and user_common_tasks with status completed.
+func CountCompletedTasks(ctx context.Context, userID int) (int, error) {
+	var n int
+	err := db.Pool.QueryRow(ctx, `
+SELECT COALESCE((SELECT COUNT(*)::int FROM user_custom_tasks uct
+    JOIN status s ON s.id = uct.status_id
+    WHERE uct.user_id = $1 AND LOWER(s.name) = 'completed'), 0)
++ COALESCE((SELECT COUNT(*)::int FROM user_common_tasks ucm
+    JOIN status s2 ON s2.id = ucm.status_id
+    WHERE ucm.user_id = $1 AND LOWER(s2.name) = 'completed'), 0)`,
+		userID).Scan(&n)
+	if err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
+func DeleteAgentTask(ctx context.Context, email string, userCommonTaskID int) error {
+	// Same semantics as DeleteTask — try custom first then agent linkage.
+	return DeleteTask(ctx, email, userCommonTaskID)
 }
 
 func AddTask(ctx context.Context, email string, req taskplan.AddTaskRequest) (*taskplan.Task, error) {

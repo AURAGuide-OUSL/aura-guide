@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { palette, commonStyles } from "../../theme";
 import { AppCard } from "../../components/AppCard";
@@ -11,12 +11,42 @@ import { PrimaryButton } from "../../components/PrimaryButton";
 import { InputField } from "../../components/InputField";
 import { api } from "../../api/api";
 import { screenStyles } from "../../styles/screenStyles";
+import { PendingTaskAnswerPayload } from "../AICoach";
 
 function statusLabel(status: string | undefined) {
   const s = (status || "").toLowerCase();
   if (s === "completed") return "Done";
   if (s === "in_progress") return "In progress";
   return "To do";
+}
+
+async function confirmDeleteTask(summary: string): Promise<boolean> {
+  const message = summary ? `Remove this task?\n\n${summary}` : "Remove this task?";
+
+  if (Platform.OS === "web") {
+    if (typeof window === "undefined") return false;
+    return window.confirm(message);
+  }
+
+  return new Promise<boolean>((resolve) => {
+    Alert.alert(
+      "Delete Task",
+      message,
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+          onPress: () => resolve(false),
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => resolve(true),
+        },
+      ],
+      { cancelable: true, onDismiss: () => resolve(false) },
+    );
+  });
 }
 
 function statusProgress(status: string | undefined) {
@@ -26,10 +56,38 @@ function statusProgress(status: string | undefined) {
   return 20;
 }
 
-export function TasksScreen({ onNavigateCalendar }: { onNavigateCalendar: () => void }) {
-  const { width } = useWindowDimensions();
+function parseTaskInstant(value: unknown): number {
+  const s = typeof value === "string" ? value : "";
+  if (!s) return Number.MAX_SAFE_INTEGER;
+  const t = Date.parse(s);
+  return Number.isFinite(t) ? t : Number.MAX_SAFE_INTEGER;
+}
+
+/** Due soon / recent first for open tasks; most recently ended first for completed. */
+function sortTasksForTab(tab: string, taskList: any[]): any[] {
+  const copy = [...taskList];
+  if (tab === "Completed") {
+    copy.sort((a, b) => parseTaskInstant(b.end_date_time) - parseTaskInstant(a.end_date_time));
+    return copy;
+  }
+  copy.sort((a, b) => {
+    const endDiff = parseTaskInstant(a.end_date_time) - parseTaskInstant(b.end_date_time);
+    if (endDiff !== 0) return endDiff;
+    return parseTaskInstant(a.start_date_time) - parseTaskInstant(b.start_date_time);
+  });
+  return copy;
+}
+
+export function TasksScreen({
+  onNavigateCalendar,
+  onRequestAgentTaskAnswer,
+}: {
+  onNavigateCalendar: () => void;
+  onRequestAgentTaskAnswer?: (payload: PendingTaskAnswerPayload) => void;
+}) {
   const [listTab, setListTab] = useState("Today");
   const [tasks, setTasks] = useState<any[]>([]);
+  const [showAddTaskCard, setShowAddTaskCard] = useState(false);
   const [newTask, setNewTask] = useState("");
   const [newStartDate, setNewStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [newEndDate, setNewEndDate] = useState(new Date().toISOString().slice(0, 10));
@@ -63,7 +121,8 @@ export function TasksScreen({ onNavigateCalendar }: { onNavigateCalendar: () => 
   );
   const completed = tasks.filter((task) => (task.status || "").toLowerCase() === "completed");
 
-  const shown = listTab === "Today" ? todayTasks : listTab === "Upcoming" ? upcomingTasks : completed;
+  const rawShown = listTab === "Today" ? todayTasks : listTab === "Upcoming" ? upcomingTasks : completed;
+  const shown = sortTasksForTab(listTab, rawShown);
 
   const addTask = async () => {
     if (!newTask.trim()) return;
@@ -82,6 +141,7 @@ export function TasksScreen({ onNavigateCalendar }: { onNavigateCalendar: () => 
       end_date_time: `${newEndDate}T18:00:00.000Z`,
     });
     setNewTask("");
+    setShowAddTaskCard(false);
     await loadTasks();
     Alert.alert("Success", "Task added successfully.");
   };
@@ -95,22 +155,35 @@ export function TasksScreen({ onNavigateCalendar }: { onNavigateCalendar: () => 
     await loadTasks();
   };
 
-  const deleteTask = async (taskId: number) => {
-    Alert.alert("Delete Task", "Are you sure you want to delete this task?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await api.deleteTask(taskId);
-            await loadTasks();
-          } catch (error) {
-            Alert.alert("Delete failed", (error as Error).message);
-          }
-        },
-      },
-    ]);
+  const deleteTaskPressed = async (task: any) => {
+    const rawId = task.id;
+    const id = Number(rawId);
+    if (!Number.isFinite(id)) {
+      if (Platform.OS === "web") {
+        typeof window !== "undefined" && window.alert("Invalid task id.");
+      } else {
+        Alert.alert("Error", "Invalid task id.");
+      }
+      return;
+    }
+
+    const title = typeof task.task === "string" ? task.task.trim() : "";
+    const excerpt = title.length > 90 ? `${title.slice(0, 90)}…` : title;
+
+    const confirmed = await confirmDeleteTask(excerpt || "(no description)");
+    if (!confirmed) return;
+
+    try {
+      await api.deleteTask(id);
+      await loadTasks();
+    } catch (error) {
+      const msg = (error as Error).message || "Something went wrong";
+      if (Platform.OS === "web") {
+        typeof window !== "undefined" && window.alert(`Delete failed: ${msg}`);
+      } else {
+        Alert.alert("Delete failed", msg);
+      }
+    }
   };
 
   return (
@@ -119,15 +192,72 @@ export function TasksScreen({ onNavigateCalendar }: { onNavigateCalendar: () => 
         title="Tasks"
         subtitle="Stay on top of your plan"
         rightAction={
-          <Pressable onPress={onNavigateCalendar} style={styles.iconButton} accessibilityLabel="Open calendar">
-            <Ionicons name="calendar" size={22} color={palette.primary} />
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable
+              onPress={() => setShowAddTaskCard(true)}
+              style={styles.iconButton}
+              accessibilityLabel="Add new task"
+            >
+              <Ionicons name="add" size={24} color={palette.primary} />
+            </Pressable>
+            <Pressable onPress={onNavigateCalendar} style={styles.iconButton} accessibilityLabel="Open calendar">
+              <Ionicons name="calendar" size={22} color={palette.primary} />
+            </Pressable>
+          </View>
         }
       />
 
       <View style={styles.tabContainer}>
         <SegmentedControl options={["Today", "Upcoming", "Completed"]} value={listTab} onChange={setListTab} />
       </View>
+
+      {showAddTaskCard ? (
+        <View style={styles.addTaskSheet}>
+          <View style={styles.addTaskToolbar}>
+            <Text style={styles.addTaskToolbarTitle}>Create Task</Text>
+            <Pressable
+              onPress={() => setShowAddTaskCard(false)}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              accessibilityLabel="Cancel create task"
+            >
+              <Text style={styles.cancelLink}>Cancel</Text>
+            </Pressable>
+          </View>
+          <AppCard style={styles.addCard}>
+            <View style={styles.addHeader}>
+              <View style={styles.addIconCircle}>
+                <Ionicons name="add" size={24} color={palette.primary} />
+              </View>
+              <View>
+                <Text style={styles.addTitle}>Create Task</Text>
+                <Text style={styles.addHint}>Add a custom goal to your track</Text>
+              </View>
+            </View>
+            <View style={commonStyles.stackSm}>
+              <InputField
+                label="Task Name"
+                placeholder="e.g. Learn React Navigation"
+                value={newTask}
+                onChangeText={setNewTask}
+              />
+              <View style={styles.dateInputRow}>
+                <View style={commonStyles.flexOne}>
+                  <InputField
+                    label="Start Date"
+                    placeholder="YYYY-MM-DD"
+                    value={newStartDate}
+                    onChangeText={setNewStartDate}
+                  />
+                </View>
+                <View style={commonStyles.flexOne}>
+                  <InputField label="End Date" placeholder="YYYY-MM-DD" value={newEndDate} onChangeText={setNewEndDate} />
+                </View>
+              </View>
+              <PrimaryButton label="Add Task" onPress={addTask} />
+            </View>
+          </AppCard>
+        </View>
+      ) : null}
 
       {shown.length === 0 ? (
         <AppCard style={styles.emptyCard}>
@@ -145,24 +275,33 @@ export function TasksScreen({ onNavigateCalendar }: { onNavigateCalendar: () => 
 
       <View style={commonStyles.stackMd}>
         {shown.map((task) => (
-          <AppCard key={task.id} style={styles.taskCard}>
+          <AppCard key={`${task.task_origin ?? "custom"}-${task.id}`} style={styles.taskCard}>
             <View style={styles.cardTop}>
               <View style={commonStyles.flexOne}>
-                <Text style={commonStyles.cardTitle} numberOfLines={3}>
+                <Text selectable style={styles.taskDescription}>
                   {task.task}
                 </Text>
                 <View style={[commonStyles.badgeRow, styles.badges]}>
-                  {task.is_custom ? (
+                  {(task.task_origin ?? "custom") === "agent" ? (
+                    <Badge label="Agent" backgroundColor="#EEF2FF" textColor="#4338CA" />
+                  ) : task.is_custom ? (
                     <Badge label="Personal" backgroundColor={palette.chipGreen} textColor={palette.accent} />
                   ) : (
-                    <Badge label="AURA" backgroundColor={palette.chipPurple} textColor={palette.secondary} />
+                    <Badge label="Plan" backgroundColor={palette.chipPurple} textColor={palette.secondary} />
                   )}
                   <Badge label={statusLabel(task.status)} backgroundColor={palette.surfaceMuted} textColor={palette.muted} />
                 </View>
               </View>
-              <Pressable onPress={() => deleteTask(task.id)} style={styles.deleteButton}>
+              <TouchableOpacity
+                activeOpacity={0.75}
+                onPress={() => void deleteTaskPressed(task)}
+                style={styles.deleteButton}
+                hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+                accessibilityLabel="Delete task"
+                accessibilityRole="button"
+              >
                 <Ionicons name="trash-outline" size={18} color={palette.danger} />
-              </Pressable>
+              </TouchableOpacity>
             </View>
 
             <View style={styles.progressSection}>
@@ -173,50 +312,48 @@ export function TasksScreen({ onNavigateCalendar }: { onNavigateCalendar: () => 
               <View style={styles.dateInfo}>
                 <Ionicons name="calendar-outline" size={14} color={palette.muted} />
                 <Text style={styles.dateText}>
-                  {safeDate(task.start_date_time).slice(0, 10)} → {safeDate(task.end_date_time).slice(0, 10) || "—"}
+                  {safeDate(task.start_date_time).slice(0, 10)} → {safeDate(task.end_date_time).slice(0, 10) || "-"}
                 </Text>
               </View>
             </View>
 
+            {(task.task_origin ?? "custom") === "agent" &&
+            String(task.status || "").toLowerCase() !== "completed" &&
+            onRequestAgentTaskAnswer ? (
+              <Pressable
+                style={styles.agentAnswerBtn}
+                onPress={() =>
+                  onRequestAgentTaskAnswer({
+                    userCommonTaskId: task.id,
+                    taskText: task.task,
+                    skillName: task.skill_name || "Code Understanding",
+                  })
+                }
+              >
+                <Ionicons name="chatbubble-ellipses-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.agentAnswerBtnText}>Answer in AI Coach</Text>
+              </Pressable>
+            ) : null}
             {task.is_custom ? (
               <View style={styles.actions}>
                 <MiniAction label="To Do" onPress={() => moveTask(task, "pending")} active={task.status === "pending"} />
                 <MiniAction label="Doing" onPress={() => moveTask(task, "in_progress")} active={task.status === "in_progress"} />
                 <MiniAction label="Done" onPress={() => moveTask(task, "completed")} primary />
               </View>
-            ) : (
+            ) : (task.task_origin ?? "custom") !== "agent" ? (
               <View style={styles.auraHint}>
                 <Ionicons name="sparkles-outline" size={12} color={palette.muted} />
-                <Text style={styles.hintText}>Managed by AI Coach interactions</Text>
+                <Text style={styles.hintText}>Suggested from your plan</Text>
+              </View>
+            ) : (
+              <View style={styles.auraHint}>
+                <Ionicons name="information-circle-outline" size={12} color={palette.muted} />
+                <Text style={styles.hintText}>Submit your answer from AI Coach to receive feedback.</Text>
               </View>
             )}
           </AppCard>
         ))}
       </View>
-
-      <AppCard style={styles.addCard}>
-        <View style={styles.addHeader}>
-          <View style={styles.addIconCircle}>
-            <Ionicons name="add" size={24} color={palette.primary} />
-          </View>
-          <View>
-            <Text style={styles.addTitle}>Create Task</Text>
-            <Text style={styles.addHint}>Add a custom goal to your track</Text>
-          </View>
-        </View>
-        <View style={commonStyles.stackSm}>
-          <InputField label="Task Name" placeholder="e.g. Learn React Navigation" value={newTask} onChangeText={setNewTask} />
-          <View style={styles.dateInputRow}>
-            <View style={commonStyles.flexOne}>
-              <InputField label="Start Date" placeholder="YYYY-MM-DD" value={newStartDate} onChangeText={setNewStartDate} />
-            </View>
-            <View style={commonStyles.flexOne}>
-              <InputField label="End Date" placeholder="YYYY-MM-DD" value={newEndDate} onChangeText={setNewEndDate} />
-            </View>
-          </View>
-          <PrimaryButton label="Add Task" onPress={addTask} />
-        </View>
-      </AppCard>
     </ScrollView>
   );
 }
@@ -251,6 +388,11 @@ function MiniAction({
 }
 
 const styles = StyleSheet.create({
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
   iconButton: {
     width: 44,
     height: 44,
@@ -261,11 +403,37 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.border,
   },
+  addTaskSheet: {
+    marginBottom: 16,
+    gap: 10,
+  },
+  addTaskToolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 4,
+  },
+  addTaskToolbarTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: palette.text,
+  },
+  cancelLink: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: palette.primary,
+  },
   tabContainer: {
     marginBottom: 16,
   },
   taskCard: {
     padding: 16,
+  },
+  taskDescription: {
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: "600",
+    color: palette.text,
   },
   cardTop: {
     flexDirection: "row",
@@ -345,6 +513,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: palette.muted,
     fontWeight: "600",
+  },
+  agentAnswerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: palette.primary,
+    marginBottom: 10,
+  },
+  agentAnswerBtnText: {
+    color: "#FFFFFF",
+    fontWeight: "800",
+    fontSize: 14,
   },
   emptyCard: {
     alignItems: "center",

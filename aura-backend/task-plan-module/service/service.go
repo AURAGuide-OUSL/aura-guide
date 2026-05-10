@@ -42,6 +42,10 @@ func DeleteTask(ctx context.Context, email string, taskID int) error {
 	return dao.DeleteTask(ctx, email, taskID)
 }
 
+func DeleteAgentTask(ctx context.Context, email string, userCommonTaskID int) error {
+	return dao.DeleteAgentTask(ctx, email, userCommonTaskID)
+}
+
 func GetTasksForDate(ctx context.Context, email string, date time.Time) ([]taskplan.Task, error) {
 	return dao.GetTasksForDate(ctx, email, date)
 }

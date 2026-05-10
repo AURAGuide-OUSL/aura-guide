@@ -7,7 +7,7 @@ import { Badge } from "../../components/Badge";
 import { ProgressBar } from "../../components/ProgressBar";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { TextLink } from "../../components/TextLink";
-import { UserProfile, Route } from "../../types";
+import { UserProfile, Route, TabRoute } from "../../types";
 import { api } from "../../api/api";
 import { screenStyles } from "../../styles/screenStyles";
 
@@ -33,13 +33,31 @@ function taskProgress(status: string | undefined) {
   return 18;
 }
 
+function LinearQuickIcon({
+  bg,
+  iconColor,
+  name,
+}: {
+  bg: string;
+  iconColor: string;
+  name: keyof typeof Ionicons.glyphMap;
+}) {
+  return (
+    <View style={[styles.quickIconOuter, { backgroundColor: bg }]}>
+      <Ionicons name={name} size={22} color={iconColor} />
+    </View>
+  );
+}
+
 export function DashboardScreen({
   user,
   onNavigate,
+  onNavigateTab,
   onSignOut,
 }: {
   user: UserProfile;
   onNavigate: (route: Route) => void;
+  onNavigateTab?: (tab: TabRoute) => void;
   onSignOut: () => void;
 }) {
   const { width } = useWindowDimensions();
@@ -47,6 +65,7 @@ export function DashboardScreen({
   const [todayPlan, setTodayPlan] = useState<any[]>([]);
   const [dayStreak, setDayStreak] = useState(1);
   const [score, setScore] = useState(user.currentScore || 0);
+  const [readiness, setReadiness] = useState(user.skillReadinessLabel || "");
   const [reminder, setReminder] = useState("");
   const [quote, setQuote] = useState("");
 
@@ -60,14 +79,16 @@ export function DashboardScreen({
         setTodayPlan(Array.isArray(data.todays_plan) ? data.todays_plan : []);
         setDayStreak(typeof data.day_streak === "number" ? data.day_streak : 1);
         setScore(typeof data.current_score === "number" ? data.current_score : 0);
+        setReadiness(typeof data.skill_readiness_label === "string" ? data.skill_readiness_label : "");
       })
       .catch(() => {
         setTasks([]);
         setTodayPlan([]);
         setDayStreak(1);
         setScore(user.currentScore || 0);
+        setReadiness(user.skillReadinessLabel || "");
       });
-  }, [user.currentScore]);
+  }, [user.currentScore, user.skillReadinessLabel]);
 
   useEffect(() => {
     Promise.all([api.getDailyTaskReminder().catch(() => ({ message: "" })), api.getMotivationalQuote().catch(() => ({ message: "" }))]).then(([r, q]) => {
@@ -87,8 +108,10 @@ export function DashboardScreen({
 
   const name = user.firstName?.trim() || "there";
 
+  const goTab = onNavigateTab ?? ((_t: TabRoute) => {});
+
   return (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={screenStyles.scrollContent}>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[screenStyles.scrollContent, styles.screenRoot]}>
       <ScreenHeader
         title={`Welcome back,\n${name}!`}
         subtitle={formatToday()}
@@ -110,18 +133,19 @@ export function DashboardScreen({
       />
 
       <View style={[styles.statsRow, width < 360 && styles.statsRowStack]}>
-        <AppCard style={styles.metricCard}>
+        <AppCard style={[styles.metricCard, styles.metricCardElevated]}>
           <View style={styles.metricContent}>
             <View>
               <Text style={styles.metricValue}>{score}</Text>
-              <Text style={styles.metricLabel}>Aura Score</Text>
+              <Text style={styles.metricLabel}>Aura score (0–100)</Text>
+              {readiness ? <Text style={styles.metricHint}>{readiness}</Text> : null}
             </View>
             <View style={[styles.metricIconWrap, { backgroundColor: palette.chipYellow }]}>
               <Ionicons name="trophy" size={28} color={palette.warning} />
             </View>
           </View>
         </AppCard>
-        <AppCard style={styles.metricCard}>
+        <AppCard style={[styles.metricCard, styles.metricCardElevated]}>
           <View style={styles.metricContent}>
             <View>
               <Text style={styles.metricValue}>{dayStreak}</Text>
@@ -153,23 +177,48 @@ export function DashboardScreen({
         {coachSupporting ? <Text style={styles.coachSupport}>{coachSupporting}</Text> : null}
       </AppCard>
 
-      <View style={styles.sectionHeadingRow}>
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-      </View>
-      <View style={styles.quickActionsGrid}>
-        <Pressable style={({ pressed }) => [styles.quickAction, pressed && styles.quickPressed]} onPress={() => onNavigate("calendar")}>
-          <View style={[styles.quickIconOuter, { backgroundColor: palette.chipBlue }]}>
-            <Ionicons name="calendar" size={24} color={palette.primary} />
-          </View>
-          <Text style={styles.quickTitle}>Calendar</Text>
-        </Pressable>
-        <Pressable style={({ pressed }) => [styles.quickAction, pressed && styles.quickPressed]} onPress={() => onNavigate("aiCoach")}>
-          <View style={[styles.quickIconOuter, { backgroundColor: palette.chipPurple }]}>
-            <Ionicons name="chatbubbles" size={24} color={palette.secondary} />
-          </View>
-          <Text style={styles.quickTitle}>AI Coach</Text>
-        </Pressable>
-      </View>
+      <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Quick Actions</Text>
+      {/*<View style={styles.quickActionsRow}>*/}
+      {/*  <Pressable*/}
+      {/*    style={({ pressed }) => [styles.quickActionTile, pressed && styles.quickPressed]}*/}
+      {/*    onPress={() => goTab("aiCoach")}*/}
+      {/*    accessibilityRole="button"*/}
+      {/*    accessibilityLabel="Open AI Coach"*/}
+      {/*  >*/}
+      {/*    <LinearQuickIcon bg="#EEF2FF" iconColor="#4F46E5" name="chatbubble-ellipses" />*/}
+      {/*    <Text style={styles.quickTileTitle}>AI Coach</Text>*/}
+      {/*    <Text style={styles.quickTileSub}>Guided prompts</Text>*/}
+      {/*  </Pressable>*/}
+      {/*  <Pressable*/}
+      {/*    style={({ pressed }) => [styles.quickActionTile, pressed && styles.quickPressed]}*/}
+      {/*    onPress={() => goTab("tasks")}*/}
+      {/*  >*/}
+      {/*    <LinearQuickIcon bg={palette.chipBlue} iconColor={palette.primary} name="checkbox-outline" />*/}
+      {/*    <Text style={styles.quickTileTitle}>Tasks</Text>*/}
+      {/*    <Text style={styles.quickTileSub}>Plan & answers</Text>*/}
+      {/*  </Pressable>*/}
+      {/*  <Pressable*/}
+      {/*    style={({ pressed }) => [styles.quickActionTile, pressed && styles.quickPressed]}*/}
+      {/*    onPress={() => goTab("goals")}*/}
+      {/*  >*/}
+      {/*    <LinearQuickIcon bg={palette.chipGreen} iconColor="#047857" name="flag" />*/}
+      {/*    <Text style={styles.quickTileTitle}>Goals</Text>*/}
+      {/*    <Text style={styles.quickTileSub}>Skills & gaps</Text>*/}
+      {/*  </Pressable>*/}
+      {/*</View>*/}
+      <Pressable
+        style={({ pressed }) => [styles.calendarRow, pressed && styles.quickPressed]}
+        onPress={() => onNavigate("calendar")}
+      >
+        <View style={[styles.quickIconOuter, { backgroundColor: palette.chipBlue }]}>
+          <Ionicons name="calendar-outline" size={22} color={palette.primary} />
+        </View>
+        <View style={commonStyles.flexOne}>
+          <Text style={styles.calendarRowTitle}>Calendar</Text>
+          <Text style={styles.calendarRowSub}>Sessions & deadlines</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={palette.muted} />
+      </Pressable>
 
       <AppCard style={commonStyles.stackMd}>
         <View style={styles.sectionHeadingRow}>
@@ -209,10 +258,12 @@ export function DashboardScreen({
       ) : null}
 
       {tasks.slice(0, 5).map((task) => (
-        <AppCard key={task.id} style={styles.taskCard}>
+        <AppCard key={task.id} style={[styles.taskCard, styles.taskCardModern]}>
           <View style={styles.taskRow}>
             <View style={commonStyles.flexOne}>
-              <Text style={commonStyles.cardTitle} numberOfLines={2}>{task.task}</Text>
+              <Text selectable style={styles.ongoingTaskBody}>
+                {task.task}
+              </Text>
               <View style={[commonStyles.badgeRow, styles.taskBadges]}>
                 {task.is_custom ? (
                   <Badge
@@ -242,6 +293,9 @@ export function DashboardScreen({
 }
 
 const styles = StyleSheet.create({
+  screenRoot: {
+    paddingBottom: 8,
+  },
   headerActions: {
     flexDirection: "row",
     gap: 8,
@@ -277,6 +331,10 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
+  metricCardElevated: {
+    borderWidth: 1,
+    borderColor: "rgba(15, 23, 42, 0.06)",
+  },
   metricContent: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -299,6 +357,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     marginTop: 2,
+  },
+  metricHint: {
+    color: palette.muted,
+    fontSize: 11,
+    fontWeight: "600",
+    marginTop: 4,
   },
   goalCard: {
     gap: 8,
@@ -372,37 +436,73 @@ const styles = StyleSheet.create({
     color: palette.text,
     letterSpacing: -0.5,
   },
-  quickActionsGrid: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 8,
+  sectionTitleSpaced: {
+    marginTop: 8,
+    marginBottom: 4,
   },
-  quickAction: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    borderRadius: 20,
+  quickActionsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 6,
+  },
+  quickActionTile: {
+    flexGrow: 1,
+    flexBasis: "30%",
+    minWidth: "28%",
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    borderRadius: 18,
     backgroundColor: palette.surface,
     borderWidth: 1,
     borderColor: palette.border,
-    gap: 10,
+    gap: 6,
+    alignItems: "flex-start",
   },
   quickPressed: {
-    opacity: 0.8,
-    transform: [{ scale: 0.98 }],
+    opacity: 0.82,
+    transform: [{ scale: 0.99 }],
   },
   quickIconOuter: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
   },
-  quickTitle: {
+  quickTileTitle: {
     fontWeight: "800",
-    fontSize: 14,
+    fontSize: 13,
     color: palette.text,
+  },
+  quickTileSub: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: palette.muted,
+    lineHeight: 15,
+  },
+  calendarRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.border,
+    marginBottom: 4,
+  },
+  calendarRowTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: palette.text,
+  },
+  calendarRowSub: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: palette.muted,
+    marginTop: 2,
   },
   timelineRow: {
     flexDirection: "row",
@@ -446,6 +546,16 @@ const styles = StyleSheet.create({
   },
   taskCard: {
     marginBottom: 12,
+  },
+  taskCardModern: {
+    borderWidth: 1,
+    borderColor: "rgba(15, 23, 42, 0.06)",
+  },
+  ongoingTaskBody: {
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: "600",
+    color: palette.text,
   },
   taskRow: {
     marginBottom: 8,

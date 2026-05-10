@@ -17,12 +17,14 @@ type Overview struct {
 }
 
 type DashboardSummary struct {
-	FirstName      string `json:"first_name"`
-	LastName       string `json:"last_name"`
-	CurrentScore   int    `json:"current_score"`
-	DayStreak      int    `json:"day_streak"`
-	CareerTitle    string `json:"career_title"`
-	TodaysPlan     []Task `json:"todays_plan"`
-	OngoingTasks   []Task `json:"ongoing_tasks"`
-	CompletedTasks int    `json:"completed_tasks"`
+	FirstName           string `json:"first_name"`
+	LastName            string `json:"last_name"`
+	CurrentScore        int    `json:"current_score"`
+	SkillAverage        float64 `json:"skill_average"`
+	SkillReadinessLabel string `json:"skill_readiness_label"`
+	DayStreak           int    `json:"day_streak"`
+	CareerTitle         string `json:"career_title"`
+	TodaysPlan          []Task `json:"todays_plan"`
+	OngoingTasks        []Task `json:"ongoing_tasks"`
+	CompletedTasks      int    `json:"completed_tasks"`
 }

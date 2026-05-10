@@ -3,8 +3,11 @@ package dao
 import (
 	"context"
 	"log"
+
 	"aura-backend/common/db"
+	"aura-backend/common/skillsmetrics"
 	"aura-backend/goal-module"
+	taskdao "aura-backend/task-plan-module/dao"
 )
 
 func GetAllGoals(ctx context.Context) ([]goal.Goal, error) {
@@ -38,11 +41,19 @@ func GetGoalSummaryByEmail(ctx context.Context, email string) (*goal.GoalSummary
 		return nil, err
 	}
 
-	if err := db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM user_custom_tasks uct
-		JOIN status s ON s.id = uct.status_id
-		WHERE uct.user_id = $1 AND LOWER(s.name) = 'completed'`, userID).Scan(&result.CompletedTasks); err != nil {
+	cnt, err := taskdao.CountCompletedTasks(ctx, userID)
+	if err != nil {
 		return nil, err
 	}
+	result.CompletedTasks = cnt
+
+	am, err := skillsmetrics.ForUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	result.AuraScorePercent = am.Percent
+	result.SkillAverage = am.Average
+	result.SkillReadinessLabel = am.ReadinessLabel
 
 	if goalID == nil {
 		return result, nil

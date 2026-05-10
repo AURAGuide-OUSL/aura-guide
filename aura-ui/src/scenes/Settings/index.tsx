@@ -31,7 +31,10 @@ export function SettingsScreen({
               <View style={[styles.iconCircle, { backgroundColor: palette.chipBlue }]}>
                 <Ionicons name="document-text-outline" size={20} color={palette.primary} />
               </View>
-              <Text style={styles.rowText}>Terms & Conditions</Text>
+              <View>
+                <Text style={styles.rowText}>Terms and Conditions — updated May 2026</Text>
+                <Text style={styles.rowMeta}>Full text opens in Terms</Text>
+              </View>
             </View>
             <Ionicons name="chevron-forward" size={18} color={palette.muted} />
           </Pressable>
@@ -119,8 +122,16 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 12,
+    flex: 1,
+    marginRight: 8,
+  },
+  rowMeta: {
+    fontSize: 12,
+    color: palette.muted,
+    marginTop: 2,
+    fontWeight: "600",
   },
   iconCircle: {
     width: 40,

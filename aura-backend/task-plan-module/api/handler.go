@@ -2,11 +2,13 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
 	"aura-backend/common/middleware"
 	taskplan "aura-backend/task-plan-module"
+	taskdao "aura-backend/task-plan-module/dao"
 	"aura-backend/task-plan-module/service"
 
 	"github.com/go-chi/chi/v5"
@@ -124,12 +126,42 @@ func DeleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := service.DeleteTask(r.Context(), email, taskID); err != nil {
+		if errors.Is(err, taskdao.ErrTaskNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
 		http.Error(w, "Error deleting task", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"message": "Task deleted successfully"})
+}
+
+func DeleteAgentTaskHandler(w http.ResponseWriter, r *http.Request) {
+	email, ok := r.Context().Value(middleware.UserEmailKey).(string)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	taskID, err := service.ParseTaskID(chi.URLParam(r, "taskId"))
+	if err != nil {
+		http.Error(w, "Invalid task id", http.StatusBadRequest)
+		return
+	}
+
+	if err := service.DeleteAgentTask(r.Context(), email, taskID); err != nil {
+		if errors.Is(err, taskdao.ErrTaskNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "Agent task deleted successfully"})
 }
 
 func AddTaskHandler(w http.ResponseWriter, r *http.Request) {

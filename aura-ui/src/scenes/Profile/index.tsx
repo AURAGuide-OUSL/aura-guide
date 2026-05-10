@@ -11,6 +11,7 @@ import { UserProfile } from "../../types";
 import { Picker } from "@react-native-picker/picker";
 import { api } from "../../api/api";
 import { screenStyles } from "../../styles/screenStyles";
+import { prettifyCvLine } from "../../utils/cvFeedback";
 
 function avgPct(skills: { current_pct?: number }[]) {
   if (!skills.length) return 0;
@@ -31,14 +32,42 @@ export function ProfileScreen({
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState(user);
   const [cvItems, setCvItems] = useState<any[]>([]);
+  const [cvInsights, setCvInsights] = useState<{
+    strengths: string[];
+    weaknesses: string[];
+    improvements: string[];
+  } | null>(null);
   const [summary, setSummary] = useState<any>({ skills: [], completed_tasks: 0 });
 
   useEffect(() => {
     setForm(user);
   }, [user]);
 
+  const loadCvSection = async () => {
+    try {
+      const [items, fb] = await Promise.all([
+        api.listCVs(),
+        api.getCVFeedback().catch(() => null),
+      ]);
+      setCvItems(Array.isArray(items) ? items : []);
+      const f = fb as any;
+      if (f && (f.strengths?.length || f.weaknesses?.length || f.improvements?.length)) {
+        setCvInsights({
+          strengths: Array.isArray(f.strengths) ? f.strengths : [],
+          weaknesses: Array.isArray(f.weaknesses) ? f.weaknesses : [],
+          improvements: Array.isArray(f.improvements) ? f.improvements : [],
+        });
+      } else {
+        setCvInsights(null);
+      }
+    } catch {
+      setCvItems([]);
+      setCvInsights(null);
+    }
+  };
+
   useEffect(() => {
-    api.listCVs().then((items) => setCvItems(Array.isArray(items) ? items : [])).catch(() => setCvItems([]));
+    loadCvSection();
   }, []);
 
   useEffect(() => {
@@ -160,8 +189,8 @@ export function ProfileScreen({
             </PickerField>
             <PickerField label="Availability (hours)" selectedValue={form.availabilityHours} onValueChange={(v) => setForm({ ...form, availabilityHours: v })}>
               <Picker.Item label="Select hours" value="" />
-              {Array.from({ length: 20 }, (_, i) => (
-                  <Picker.Item key={i + 1} label={`${i + 1}`} value={`${i + 1}`} />
+              {Array.from({ length: 24 }, (_, i) => (
+                <Picker.Item key={i + 1} label={`${i + 1} hour${i === 0 ? "" : "s"}`} value={`${i + 1}`} />
               ))}
             </PickerField>
             <View style={styles.editActions}>
@@ -176,7 +205,13 @@ export function ProfileScreen({
       <AppCard style={styles.metricsCard}>
         <Text style={styles.metricsEyebrow}>Momentum</Text>
         <View style={[styles.metricsGrid, width < 380 && styles.metricsGridStack]}>
-          <Metric icon="sparkles-outline" label="Aura score" value={`${user.currentScore ?? 0}`} tint={palette.primaryMuted} />
+          <Metric
+            icon="sparkles-outline"
+            label="Aura score"
+            value={`${summary.aura_score_percent ?? user.currentScore ?? 0}`}
+            subtitle={summary.skill_readiness_label || user.skillReadinessLabel || ""}
+            tint={palette.primaryMuted}
+          />
           <Metric icon="checkmark-done-outline" label="Tasks done" value={`${summary.completed_tasks ?? 0}`} tint={palette.success} />
           <Metric icon="code-slash-outline" label="Technical" value={`${techAvg}%`} tint="#6366F1" />
           <Metric icon="chatbubbles-outline" label="Soft skills" value={`${softAvg}%`} tint={palette.secondary} />
@@ -184,9 +219,9 @@ export function ProfileScreen({
       </AppCard>
 
       <AppCard>
-        <Text style={styles.sectionLabel}>Uploaded CVs</Text>
+        <Text style={styles.sectionLabel}>CV & analysis</Text>
         {cvItems.length === 0 ? (
-          <Text style={styles.cvEmpty}>No CV on file yet. Use AI Coach to upload text for feedback.</Text>
+          <Text style={styles.cvEmpty}>No CV on file yet. Upload a PDF from AI Coach for agent analysis.</Text>
         ) : (
           cvItems.map((cv: any) => (
             <View key={`${cv.file_name}-${cv.uploaded_at}`} style={styles.cvRow}>
@@ -201,6 +236,30 @@ export function ProfileScreen({
             </View>
           ))
         )}
+        {cvInsights ? (
+          <View style={styles.cvInsightBlock}>
+            {cvInsights.strengths.length ? (
+              <View style={styles.cvInsightColumn}>
+                <Text style={styles.cvInsightTitle}>Strengths</Text>
+                {cvInsights.strengths.slice(0, 8).map((line, i) => (
+                  <Text key={`s-${i}`} style={styles.cvBullet}>
+                    • {prettifyCvLine(line)}
+                  </Text>
+                ))}
+              </View>
+            ) : null}
+            {cvInsights.weaknesses.length ? (
+              <View style={styles.cvInsightColumn}>
+                <Text style={styles.cvInsightTitle}>Growth areas</Text>
+                {cvInsights.weaknesses.slice(0, 8).map((line, i) => (
+                  <Text key={`w-${i}`} style={styles.cvBullet}>
+                    • {prettifyCvLine(line)}
+                  </Text>
+                ))}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
       </AppCard>
     </ScrollView>
   );
@@ -210,11 +269,13 @@ function Metric({
   icon,
   label,
   value,
+  subtitle,
   tint,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   value: string;
+  subtitle?: string;
   tint: string;
 }) {
   return (
@@ -224,6 +285,7 @@ function Metric({
       </View>
       <Text style={styles.metricValue}>{value}</Text>
       <Text style={styles.metricCap}>{label}</Text>
+      {subtitle ? <Text style={styles.metricSub}>{subtitle}</Text> : null}
     </View>
   );
 }
@@ -349,6 +411,12 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: palette.muted,
   },
+  metricSub: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: palette.muted,
+    lineHeight: 15,
+  },
   sectionLabel: {
     fontWeight: "900",
     fontSize: 16,
@@ -387,6 +455,29 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontSize: 12,
     color: palette.muted,
+    fontWeight: "600",
+  },
+  cvInsightBlock: {
+    marginTop: 16,
+    gap: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: palette.border,
+  },
+  cvInsightColumn: {
+    gap: 6,
+  },
+  cvInsightTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: palette.text,
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+  },
+  cvBullet: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: palette.text,
     fontWeight: "600",
   },
   editActions: {

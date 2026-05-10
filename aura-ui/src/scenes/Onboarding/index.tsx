@@ -123,8 +123,8 @@ export function OnboardingScreen({
             </PickerField>
             <PickerField label="Time availability (hours)" selectedValue={availabilityHours} onValueChange={(itemValue) => setAvailabilityHours(itemValue)}>
               <Picker.Item label="Select hours" value="" />
-              {Array.from({ length: 20 }, (_, i) => (
-                <Picker.Item key={i + 1} label={`${i + 1}`} value={`${i + 1}`} />
+              {Array.from({ length: 24 }, (_, i) => (
+                <Picker.Item key={i + 1} label={`${i + 1} hour${i === 0 ? "" : "s"}`} value={`${i + 1}`} />
               ))}
             </PickerField>
           </View>

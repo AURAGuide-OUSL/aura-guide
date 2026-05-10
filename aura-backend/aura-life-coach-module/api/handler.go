@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	auralifecoach "aura-backend/aura-life-coach-module"
 	"aura-backend/aura-life-coach-module/service"
@@ -90,7 +91,7 @@ func GetCVFeedbackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	feedback, err := service.GetCVFeedback(email)
+	feedback, err := service.GetCVFeedback(r.Context(), email)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -106,9 +107,41 @@ func ListCVsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	items := service.ListCVs(email)
+	items, err := service.ListCVs(r.Context(), email)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(items)
+}
+
+func UploadCVPDFHandler(w http.ResponseWriter, r *http.Request) {
+	_, ok := r.Context().Value(middleware.UserEmailKey).(string)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if !strings.EqualFold(r.Method, http.MethodPost) {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	res, err := service.AnalyzeCVPDF(r.Context(), r)
+	if err != nil {
+		msg := err.Error()
+		code := http.StatusBadRequest
+		if strings.Contains(strings.ToLower(msg), "agent") {
+			code = http.StatusBadGateway
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(code)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(res)
 }
 
 func writeQuestions(w http.ResponseWriter, r *http.Request, topic string) {

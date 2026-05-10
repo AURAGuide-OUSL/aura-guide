@@ -118,6 +118,16 @@ CREATE TABLE user_badge (
    issued_date_time TIMESTAMP
 );
 
+-- STORED CV ANALYSIS (AI agent, replaces ephemeral CV store for uploads via PDF pipeline)
+CREATE TABLE IF NOT EXISTS user_cv_analysis (
+   user_id INT PRIMARY KEY REFERENCES user_student(id),
+   file_name VARCHAR(512),
+   uploaded_at TIMESTAMP WITH TIME ZONE,
+   strengths JSONB DEFAULT '[]'::jsonb,
+   weaknesses JSONB DEFAULT '[]'::jsonb,
+   improvements JSONB DEFAULT '[]'::jsonb
+);
+
 -- CHAT SESSIONS
 CREATE TABLE chat_sessions (
    id SERIAL PRIMARY KEY,

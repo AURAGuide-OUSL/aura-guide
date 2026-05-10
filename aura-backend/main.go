@@ -110,6 +110,7 @@ func main() {
 		r.Get("/aura-life-coach/GitConceptKnowledgeQuestions", auraLifeCoachApi.GetGitConceptKnowledgeQuestionsHandler)
 		r.Get("/aura-life-coach/BehavioralInterviewFeedback", auraLifeCoachApi.GetBehavioralInterviewFeedbackHandler)
 		r.Post("/aura-life-coach/cv/upload", auraLifeCoachApi.UploadCVHandler)
+		r.Post("/aura-life-coach/cv/upload-pdf", auraLifeCoachApi.UploadCVPDFHandler)
 		r.Post("/aura-life-coach/cv/analyze", auraLifeCoachApi.AnalyzeCVHandler)
 		r.Get("/aura-life-coach/cv/feedback", auraLifeCoachApi.GetCVFeedbackHandler)
 		r.Get("/aura-life-coach/cv/list", auraLifeCoachApi.ListCVsHandler)
@@ -127,6 +128,7 @@ func main() {
 		r.Put("/task-plan/tasks/{taskId}/complete", taskPlanApi.CompleteTaskHandler)
 		r.Put("/task-plan/tasks/{taskId}", taskPlanApi.UpdateTaskHandler)
 		r.Delete("/task-plan/tasks/{taskId}", taskPlanApi.DeleteTaskHandler)
+		r.Delete("/task-plan/agent-tasks/{taskId}", taskPlanApi.DeleteAgentTaskHandler)
 
 		r.Get("/progress/overview", progressApi.GetOverviewHandler)
 		r.Get("/progress/currentTask", progressApi.GetCurrentTaskHandler)

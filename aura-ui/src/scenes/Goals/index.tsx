@@ -10,13 +10,37 @@ import { screenStyles } from "../../styles/screenStyles";
 
 export function GoalsScreen() {
   const { width } = useWindowDimensions();
-  const [summary, setSummary] = useState<any>({ completed_tasks: 0, skills: [], career_title: "" });
+  const [summary, setSummary] = useState<any>({
+    completed_tasks: 0,
+    skills: [],
+    career_title: "",
+    aura_score_percent: 0,
+    skill_readiness_label: "",
+  });
 
   useEffect(() => {
     api
       .getGoalSummary()
-      .then((data) => setSummary(data || { completed_tasks: 0, skills: [], career_title: "" }))
-      .catch(() => setSummary({ completed_tasks: 0, skills: [], career_title: "" }));
+      .then((data) =>
+        setSummary(
+          data || {
+            completed_tasks: 0,
+            skills: [],
+            career_title: "",
+            aura_score_percent: 0,
+            skill_readiness_label: "",
+          },
+        ),
+      )
+      .catch(() =>
+        setSummary({
+          completed_tasks: 0,
+          skills: [],
+          career_title: "",
+          aura_score_percent: 0,
+          skill_readiness_label: "",
+        }),
+      );
   }, []);
 
   const technicalSkills = useMemo(
@@ -64,6 +88,13 @@ export function GoalsScreen() {
             <Text style={styles.heroStatLabel}>Soft Skills</Text>
           </View>
         </View>
+        <Text style={styles.heroAuraLine}>
+          Aura (avg. of assessed skills):{" "}
+          <Text style={styles.heroAuraEm}>
+            {typeof summary.aura_score_percent === "number" ? summary.aura_score_percent : 0}/100
+          </Text>
+          {summary.skill_readiness_label ? ` · ${summary.skill_readiness_label}` : ""}
+        </Text>
       </AppCard>
 
       <SkillSection title="Technical Skills" subtitle="Core competencies for your role" tone="tech" skills={technicalSkills} empty="No technical skills found for this goal." />
@@ -200,6 +231,17 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "rgba(255,255,255,0.5)",
     textTransform: "uppercase",
+  },
+  heroAuraLine: {
+    marginTop: 4,
+    fontSize: 13,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.75)",
+    lineHeight: 18,
+  },
+  heroAuraEm: {
+    fontWeight: "800",
+    color: "#FFFFFF",
   },
   heroDivider: {
     width: 1,

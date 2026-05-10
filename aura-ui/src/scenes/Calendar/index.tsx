@@ -33,23 +33,48 @@ export function CalendarScreen({ onBack }: { onBack: () => void }) {
     load();
   }, [load]);
 
-  const calendarEvents = useMemo<ICalendarEventBase[]>(() => {
+  const calendarEvents = useMemo(() => {
     return tasks
-      .filter((task) => task.start_date_time)
+      .filter((task) => task.start_date_time && (task.status || "").toLowerCase() !== "completed")
       .map((task) => {
         const start = new Date(task.start_date_time);
         let end = task.end_date_time ? new Date(task.end_date_time) : new Date(start.getTime() + 60 * 60 * 1000);
         if (end.getTime() <= start.getTime()) {
           end = new Date(start.getTime() + 60 * 60 * 1000);
         }
-        const done = (task.status || "").toLowerCase() === "completed";
         return {
-          title: `${done ? "Done" : "Task"} · ${task.task}`,
+          title: `Task · ${task.task}`,
           start,
           end,
+          // Attach extra data for deletion
+          id: task.id,
+          origin: task.task_origin,
+          taskName: task.task,
         };
       });
   }, [tasks]);
+
+  const handleDeleteTask = (event: any) => {
+    Alert.alert(
+      "Delete Task",
+      `Are you sure you want to delete "${event.taskName}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await api.deleteTask(Number(event.id));
+              load();
+            } catch (e) {
+              Alert.alert("Error", (e as Error).message);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const upcomingCount = tasks.filter((task) => (task.status || "").toLowerCase() !== "completed").length;
   const completedCount = tasks.filter((task) => (task.status || "").toLowerCase() === "completed").length;
@@ -186,6 +211,7 @@ export function CalendarScreen({ onBack }: { onBack: () => void }) {
             dayHeaderHighlightColor="rgba(79, 70, 229, 0.45)"
             weekDayHeaderHighlightColor="rgba(37, 99, 235, 0.2)"
             onChangeDate={onSwipeDateChange}
+            onPressEvent={handleDeleteTask}
             calendarCellStyle={(date?: Date) => {
               if (!date) return {};
               const a = date;

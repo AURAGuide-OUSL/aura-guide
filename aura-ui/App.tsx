@@ -1,5 +1,5 @@
 import "react-native-gesture-handler";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -19,7 +19,7 @@ import { SignUpScreen } from "./src/scenes/SignUp";
 import { ResetPasswordScreen } from "./src/scenes/ResetPassword";
 import { OnboardingScreen } from "./src/scenes/Onboarding";
 import { DashboardScreen } from "./src/scenes/Dashboard";
-import { AICoachScreen } from "./src/scenes/AICoach";
+import { AICoachScreen, PendingTaskAnswerPayload } from "./src/scenes/AICoach";
 import { TasksScreen } from "./src/scenes/Tasks";
 import { GoalsScreen } from "./src/scenes/Goals";
 import { ProfileScreen } from "./src/scenes/Profile";
@@ -50,12 +50,25 @@ export default function App() {
     language: "English (US)",
   });
   const [termsBackRoute, setTermsBackRoute] = useState<Route>("signup");
+  const [pendingAgentTask, setPendingAgentTask] = useState<PendingTaskAnswerPayload | undefined>(undefined);
+
+  const clearPendingAgentTask = useCallback(() => {
+    setPendingAgentTask(undefined);
+  }, []);
 
   const fetchProfile = async () => {
     try {
       const profileData = await api.getUserProfile();
-      const score = await api.getSkillScore().catch(() => ({ current_score: 0 }));
-      // Map backend fields to frontend UserProfile
+      const pct =
+        typeof profileData.skill_score_percent === "number"
+          ? profileData.skill_score_percent
+          : typeof profileData.current_score === "number"
+            ? profileData.current_score
+            : 0;
+      const readiness =
+        typeof profileData.skill_readiness_label === "string"
+          ? profileData.skill_readiness_label
+          : "";
       setUser({
         firstName: profileData.first_name || "",
         lastName: profileData.last_name || "",
@@ -69,7 +82,8 @@ export default function App() {
         availabilityHours: profileData.availability_hours ? String(profileData.availability_hours) : "",
         goal: goalIdToLabel[profileData.goal_id || 1] || "Software Engineer",
         goalId: profileData.goal_id || 1,
-        currentScore: score.current_score ?? profileData.current_score ?? 0,
+        currentScore: pct,
+        skillReadinessLabel: readiness || undefined,
         recommendation: profileData.recommendation ?? "",
         joinedDate: initialProfile.joinedDate,
       });
@@ -176,11 +190,29 @@ export default function App() {
           />
         );
       case "dashboard":
-        return <DashboardScreen user={user} onNavigate={setRoute} onSignOut={handleSignOut} />;
+        return (
+          <DashboardScreen
+            user={user}
+            onNavigate={setRoute}
+            onNavigateTab={setTab}
+            onSignOut={handleSignOut}
+          />
+        );
       case "aiCoach":
-        return <AICoachScreen />;
+        return (
+          <AICoachScreen pendingTaskAnswer={pendingAgentTask} onConsumedPendingTask={clearPendingAgentTask} />
+        );
       case "tasks":
-        return <TasksScreen onNavigateCalendar={() => setRoute("calendar")} />;
+        return (
+          <TasksScreen
+            onNavigateCalendar={() => setRoute("calendar")}
+            onRequestAgentTaskAnswer={(p) => {
+              setRoute("dashboard");
+              setPendingAgentTask(p);
+              setTab("aiCoach");
+            }}
+          />
+        );
       case "goals":
         return <GoalsScreen />;
       case "profile":

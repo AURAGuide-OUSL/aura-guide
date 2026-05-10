@@ -21,6 +21,15 @@ type contextKey string
 
 const UserEmailKey contextKey = "userEmail"
 
+// JwtRawTokenKey carries the Bearer/cookie JWT string verified by AuthMiddleware so handlers
+// can forward it to downstream services without re-reading stripped headers or bodies.
+const JwtRawTokenKey contextKey = "jwtRawToken"
+
+func RawJWT(ctx context.Context) string {
+	s, _ := ctx.Value(JwtRawTokenKey).(string)
+	return strings.TrimSpace(s)
+}
+
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("token")
@@ -52,6 +61,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		ctx := context.WithValue(r.Context(), UserEmailKey, claims.Subject)
+		ctx = context.WithValue(ctx, JwtRawTokenKey, strings.TrimSpace(tokenStr))
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

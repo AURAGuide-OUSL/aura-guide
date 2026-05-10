@@ -5,12 +5,28 @@ import (
 	"net/http"
 	"time"
 
+	"aura-backend/common/skillsmetrics"
 	"aura-backend/user-module"
 	"aura-backend/user-module/dao"
 )
 
 func GetUserProfile(ctx context.Context, email string) (*user.UserStudent, error) {
-	return dao.GetUserByEmail(ctx, email)
+	u, err := dao.GetUserByEmail(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+	m, err := skillsmetrics.ForUser(ctx, u.ID)
+	if err != nil {
+		return u, nil
+	}
+	p := m.Percent
+	avg := m.Average
+	label := m.ReadinessLabel
+	u.CurrentScore = &p
+	u.SkillScorePercent = &p
+	u.SkillAverage = &avg
+	u.SkillReadinessLabel = &label
+	return u, nil
 }
 
 func UpdateProfile(ctx context.Context, profile *user.UserStudent) error {

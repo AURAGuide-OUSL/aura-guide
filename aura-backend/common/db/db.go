@@ -29,6 +29,10 @@ func InitDB() error {
 		return fmt.Errorf("unable to ping database: %v", err)
 	}
 
+	if err := ensureUserCVAnalysisTable(context.Background()); err != nil {
+		log.Printf("user_cv_analysis migration skipped: %v", err)
+	}
+
 	// Best-effort seed data. We keep the backend running even if seeding fails,
 	// because schema migrations/ownership are handled separately.
 	if err := runSeeds(context.Background()); err != nil {
@@ -42,6 +46,19 @@ func CloseDB() {
 	if Pool != nil {
 		Pool.Close()
 	}
+}
+
+func ensureUserCVAnalysisTable(ctx context.Context) error {
+	_, err := Pool.Exec(ctx, `
+CREATE TABLE IF NOT EXISTS user_cv_analysis (
+   user_id INT PRIMARY KEY REFERENCES user_student(id),
+   file_name VARCHAR(512),
+   uploaded_at TIMESTAMP WITH TIME ZONE,
+   strengths JSONB DEFAULT '[]'::jsonb,
+   weaknesses JSONB DEFAULT '[]'::jsonb,
+   improvements JSONB DEFAULT '[]'::jsonb
+)`)
+	return err
 }
 
 func runSeeds(ctx context.Context) error {

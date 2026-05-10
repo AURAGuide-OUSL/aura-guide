@@ -9,14 +9,17 @@ type CareerPathResponse struct {
 }
 
 type SkillScoreResponse struct {
-	CurrentScore int    `json:"current_score"`
-	SkillLevel   string `json:"skill_level"`
+	CurrentScore int     `json:"current_score"`
+	SkillLevel   string  `json:"skill_level"`
+	SkillAverage float64 `json:"skill_average"`
 }
 
 type Task struct {
 	ID            int        `json:"id"`
 	SkillID       *int       `json:"skill_id,omitempty"`
+	SkillName     string     `json:"skill_name,omitempty"`
 	IsCustom      bool       `json:"is_custom"`
+	TaskOrigin    string     `json:"task_origin"` // "custom" (user_custom_tasks) or "agent" (user_common_tasks)
 	Task          string     `json:"task"`
 	Status        string     `json:"status"`
 	StartDateTime *time.Time `json:"start_date_time,omitempty"`
