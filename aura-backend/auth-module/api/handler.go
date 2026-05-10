@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"aura-backend/auth-module/service"
@@ -109,6 +110,10 @@ func signin(w http.ResponseWriter, r *http.Request) {
 	var req AuthRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(req.Email) == "" || req.Password == "" {
+		http.Error(w, "email and password are required", http.StatusBadRequest)
 		return
 	}
 

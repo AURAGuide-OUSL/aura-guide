@@ -108,17 +108,18 @@ export default function App() {
   }, []);
 
   const handleSignIn = async (email?: string, password?: string) => {
-    if (email && password) {
-      try {
-        await api.login({ email, password });
-        const ok = await fetchProfile();
-        if (ok) setRoute("dashboard");
-      } catch (err) {
-        alert("Login failed: " + (err as Error).message);
-      }
-    } else {
-      // Legacy or manual trigger
-      setRoute("dashboard");
+    const normalizedEmail = (email ?? "").trim().toLowerCase();
+    const passwordValue = password ?? "";
+    if (!normalizedEmail || !passwordValue) {
+      alert("Enter your email and password to sign in.");
+      return;
+    }
+    try {
+      await api.login({ email: normalizedEmail, password: passwordValue });
+      const ok = await fetchProfile();
+      if (ok) setRoute("dashboard");
+    } catch (err) {
+      alert("Login failed: " + (err as Error).message);
     }
   };
 

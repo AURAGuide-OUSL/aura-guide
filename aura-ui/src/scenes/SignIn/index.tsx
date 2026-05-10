@@ -20,6 +20,7 @@ export function SignInScreen({
   const [email, setEmail] = useState(initialProfile.email);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const canSubmit = Boolean(email.trim()) && password.length > 0;
 
   return (
     <ScrollView contentContainerStyle={styles.authScroll}>
@@ -55,7 +56,11 @@ export function SignInScreen({
           <TextLink label="Forgot password?" onPress={onOpenReset} />
         </View>
 
-        <PrimaryButton label="Sign In" onPress={() => onSignIn(email, password)} />
+        <PrimaryButton
+          label="Sign In"
+          disabled={!canSubmit}
+          onPress={() => onSignIn(email.trim(), password)}
+        />
       </AppCard>
 
       <View style={styles.authFooter}>
