@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import "react-native-gesture-handler";
 import React, { useCallback, useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
@@ -51,6 +52,7 @@ export default function App() {
   });
   const [termsBackRoute, setTermsBackRoute] = useState<Route>("signup");
   const [pendingAgentTask, setPendingAgentTask] = useState<PendingTaskAnswerPayload | undefined>(undefined);
+  const [isReturningUser, setIsReturningUser] = useState(true);
 
   const clearPendingAgentTask = useCallback(() => {
     setPendingAgentTask(undefined);
@@ -95,6 +97,8 @@ export default function App() {
 
   useEffect(() => {
     const checkAuth = async () => {
+      const returning = (await AsyncStorage.getItem("aura_returning_user")) === "1";
+      setIsReturningUser(returning);
       const ok = await fetchProfile();
       if (ok) {
         setRoute("dashboard");
@@ -103,8 +107,12 @@ export default function App() {
       }
     };
 
-    const timer = setTimeout(checkAuth, 2000); // Keep splash for a bit
+    const timer = setTimeout(checkAuth, 2000);
     return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.getItem("aura_returning_user").then((v) => setIsReturningUser(v === "1"));
   }, []);
 
   const handleSignIn = async (email?: string, password?: string) => {
@@ -117,7 +125,11 @@ export default function App() {
     try {
       await api.login({ email: normalizedEmail, password: passwordValue });
       const ok = await fetchProfile();
-      if (ok) setRoute("dashboard");
+      if (ok) {
+        await AsyncStorage.setItem("aura_returning_user", "1");
+        setIsReturningUser(true);
+        setRoute("dashboard");
+      }
     } catch (err) {
       alert("Login failed: " + (err as Error).message);
     }
@@ -135,6 +147,7 @@ export default function App() {
       await api.login({ email: profile.email, password: profile.password });
       const ok = await fetchProfile();
       if (ok) {
+        setIsReturningUser(false);
         setRoute("dashboard");
       }
     } catch (err) {
@@ -194,6 +207,7 @@ export default function App() {
         return (
           <DashboardScreen
             user={user}
+            isReturningUser={isReturningUser}
             onNavigate={setRoute}
             onNavigateTab={setTab}
             onSignOut={handleSignOut}
@@ -221,6 +235,7 @@ export default function App() {
           <ProfileScreen
             user={user}
             onNavigateSettings={() => setRoute("settings")}
+            onSignOut={handleSignOut}
             onProfileUpdated={async () => {
               await fetchProfile();
             }}
@@ -237,6 +252,11 @@ export default function App() {
             }}
             onBack={() => setRoute("profile")}
             onSignOut={handleSignOut}
+            onDeleteAccount={async () => {
+              await api.deleteAccount();
+              setRoute("signin");
+              setTab("dashboard");
+            }}
           />
         );
       case "notifications":

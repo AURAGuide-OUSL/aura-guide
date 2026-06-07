@@ -22,10 +22,12 @@ function avgPct(skills: { current_pct?: number }[]) {
 export function ProfileScreen({
   user,
   onNavigateSettings,
+  onSignOut,
   onProfileUpdated,
 }: {
   user: UserProfile;
   onNavigateSettings: () => void;
+  onSignOut?: () => void;
   onProfileUpdated: () => Promise<void>;
 }) {
   const { width } = useWindowDimensions();
@@ -38,6 +40,7 @@ export function ProfileScreen({
     improvements: string[];
   } | null>(null);
   const [summary, setSummary] = useState<any>({ skills: [], completed_tasks: 0 });
+  const [downloadingCv, setDownloadingCv] = useState(false);
 
   useEffect(() => {
     setForm(user);
@@ -84,6 +87,17 @@ export function ProfileScreen({
   );
 
   const initials = `${(form.firstName || "?").slice(0, 1)}${(form.lastName || "").slice(0, 1)}`.toUpperCase();
+
+  const downloadCv = async () => {
+    setDownloadingCv(true);
+    try {
+      await api.downloadCV();
+    } catch (error) {
+      Alert.alert("Download failed", (error as Error).message);
+    } finally {
+      setDownloadingCv(false);
+    }
+  };
 
   const saveProfile = async () => {
     try {
@@ -218,6 +232,10 @@ export function ProfileScreen({
         </View>
       </AppCard>
 
+      {onSignOut ? (
+        <PrimaryButton label="Sign Out" onPress={onSignOut} variant="danger" />
+      ) : null}
+
       <AppCard>
         <Text style={styles.sectionLabel}>CV & analysis</Text>
         {cvItems.length === 0 ? (
@@ -232,7 +250,14 @@ export function ProfileScreen({
                 <Text style={styles.cvFile}>{cv.file_name}</Text>
                 <Text style={styles.cvDate}>{String(cv.uploaded_at).slice(0, 16).replace("T", " · ")}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={palette.muted} />
+              <Pressable
+                onPress={downloadCv}
+                disabled={downloadingCv}
+                style={({ pressed }) => [styles.cvDownloadBtn, pressed && styles.cvDownloadBtnPressed]}
+                accessibilityLabel="Download CV PDF"
+              >
+                <Ionicons name={downloadingCv ? "hourglass-outline" : "download-outline"} size={20} color={palette.primary} />
+              </Pressable>
             </View>
           ))
         )}
@@ -456,6 +481,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: palette.muted,
     fontWeight: "600",
+  },
+  cvDownloadBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: palette.chipBlue,
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  cvDownloadBtnPressed: {
+    opacity: 0.85,
   },
   cvInsightBlock: {
     marginTop: 16,

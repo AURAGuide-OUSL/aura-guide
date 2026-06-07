@@ -79,6 +79,15 @@ export const api = {
     if (!response.ok) throw new Error(await response.text());
     return response.json();
   },
+  async deleteAccount() {
+    const response = await fetch(`${API_BASE_URL}/users/profile/me`, {
+      method: "DELETE",
+      headers: await authHeaders(false),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    await AsyncStorage.removeItem("auth_token");
+    return response.json();
+  },
   async getCareerPath() {
     const response = await fetch(`${API_BASE_URL}/user/careerPath`, {
       method: "GET",
@@ -196,6 +205,43 @@ export const api = {
     });
     if (!response.ok) throw new Error(await response.text());
     return response.json();
+  },
+  async downloadCV() {
+    const token = await AsyncStorage.getItem("auth_token");
+    if (!token) throw new Error("No auth token found");
+    const response = await fetch(`${API_BASE_URL}/aura-life-coach/cv/download`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+      ...(Platform.OS === "web" ? { credentials: "include" as RequestCredentials } : {}),
+    });
+    if (!response.ok) {
+      let msg = await response.text();
+      try {
+        const j = JSON.parse(msg);
+        if (j?.error) msg = j.error;
+      } catch {
+        /* plain text */
+      }
+      throw new Error(msg || "Download failed");
+    }
+    const blob = await response.blob();
+    const disp = response.headers.get("Content-Disposition") || "";
+    const match = /filename="?([^";]+)"?/i.exec(disp);
+    const fileName = (match?.[1] || "cv.pdf").trim();
+
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      return { fileName };
+    }
+
+    throw new Error("CV download is available on web. Open Profile in your browser to save the PDF.");
   },
   async getGoalSummary() {
     const response = await fetch(`${API_BASE_URL}/goals/summary`, {

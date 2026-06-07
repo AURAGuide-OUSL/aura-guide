@@ -8,7 +8,7 @@ import { termsIntroduction, termsSections, termsUpdatedSubtitle } from "./termsC
 export function TermsScreen({ onBack }: { onBack: () => void }) {
   return (
     <ScrollView contentContainerStyle={styles.screenContent}>
-      <ScreenHeader title="Terms and Conditions- Updated one" subtitle={termsUpdatedSubtitle} onBack={onBack} />
+      <ScreenHeader title="Terms and Conditions" subtitle={termsUpdatedSubtitle} onBack={onBack} />
 
       <AppCard style={commonStyles.stackMd}>
         <Text style={styles.intro}>{termsIntroduction}</Text>
