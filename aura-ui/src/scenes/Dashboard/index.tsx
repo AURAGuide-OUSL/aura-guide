@@ -51,11 +51,13 @@ function LinearQuickIcon({
 
 export function DashboardScreen({
   user,
+  isReturningUser = true,
   onNavigate,
   onNavigateTab,
   onSignOut,
 }: {
   user: UserProfile;
+  isReturningUser?: boolean;
   onNavigate: (route: Route) => void;
   onNavigateTab?: (tab: TabRoute) => void;
   onSignOut: () => void;
@@ -112,8 +114,9 @@ export function DashboardScreen({
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[screenStyles.scrollContent, styles.screenRoot]}>
+      {/*<Text style={styles.appTitle}>AURA Guide – Your Personalized Career Coach</Text>*/}
       <ScreenHeader
-        title={`Welcome back,\n${name}!`}
+        title={isReturningUser ? `Welcome back,\n${name}!` : `Welcome,\n${name}!`}
         subtitle={formatToday()}
         leftAction={
           <View style={styles.headerLogo}>
@@ -226,7 +229,7 @@ export function DashboardScreen({
         </View>
         <View style={commonStyles.stackSm}>
           {todayPlan.length === 0 ? (
-            <Text style={styles.emptyMuted}>Nothing scheduled today yet. Add tasks from the Tasks tab.</Text>
+            <Text style={styles.emptyMuted}>No tasks yet. Ask AI Coach to assign one, or add your own from Tasks.</Text>
           ) : null}
           {todayPlan.map((item) => (
             <View key={`${item.id}-${item.task}`} style={styles.timelineRow}>
@@ -283,7 +286,7 @@ export function DashboardScreen({
             <Ionicons name="calendar-outline" size={12} color={palette.muted} />
             <Text style={styles.taskDate}>
               {safeDate(task.start_date_time).slice(0, 10)}
-              {safeDate(task.end_date_time) ? ` → ${safeDate(task.end_date_time).slice(0, 10)}` : ""}
+              {safeDate(task.end_date_time) ? ` - ${safeDate(task.end_date_time).slice(0, 10)}` : ""}
             </Text>
           </View>
         </AppCard>
@@ -295,6 +298,14 @@ export function DashboardScreen({
 const styles = StyleSheet.create({
   screenRoot: {
     paddingBottom: 8,
+  },
+  appTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: palette.primary,
+    letterSpacing: 0.3,
+    marginBottom: 4,
+    textTransform: "uppercase",
   },
   headerActions: {
     flexDirection: "row",

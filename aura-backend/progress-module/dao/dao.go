@@ -104,7 +104,6 @@ func GetDashboardSummary(ctx context.Context, email string) (*progress.Dashboard
 
 	now := time.Now()
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	todayEnd := todayStart.Add(24 * time.Hour)
 
 	completedCnt, err := taskdao.CountCompletedTasks(ctx, userID)
 	if err != nil {
@@ -129,7 +128,9 @@ func GetDashboardSummary(ctx context.Context, email string) (*progress.Dashboard
 
 		if task.StartDateTime != nil {
 			taskStart := task.StartDateTime.In(now.Location())
-			if !taskStart.Before(todayStart) && taskStart.Before(todayEnd) {
+			taskDay := time.Date(taskStart.Year(), taskStart.Month(), taskStart.Day(), 0, 0, 0, 0, now.Location())
+			// Due today or overdue (aligned with Tasks "Today" tab)
+			if !taskDay.After(todayStart) {
 				summary.TodaysPlan = append(summary.TodaysPlan, taskItem)
 			}
 		}

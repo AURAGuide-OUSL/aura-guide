@@ -155,10 +155,10 @@ function SkillSection({
               </View>
               <View style={styles.levelRow}>
                 <Text style={styles.levelHint}>
-                  Level: <Text style={styles.levelValue}>{skill.current_level || "Beginner"}</Text>
+                  Level: <Text style={styles.levelValue}>{skill.current_level || "Not assessed"}</Text>
                 </Text>
                 <Text style={styles.levelHint}>
-                  Target: <Text style={styles.levelValue}>{skill.required_level || "Intermediate"}</Text>
+                  Target: <Text style={styles.levelValue}>{skill.required_level || "—"}</Text>
                 </Text>
               </View>
               <ProgressBar value={Math.min(skill.current_pct, 100)} color={barColor} />

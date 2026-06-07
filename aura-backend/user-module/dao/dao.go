@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"aura-backend/common/cvstorage"
 	"aura-backend/common/db"
 	"aura-backend/user-module"
 )
@@ -73,6 +74,30 @@ func GetAllUsers(ctx context.Context) ([]user.UserStudent, error) {
 }
 
 func DeleteUserByEmail(ctx context.Context, email string) error {
-	_, err := db.Pool.Exec(ctx, `DELETE FROM user_student WHERE email = $1`, email)
-	return err
+	u, err := GetUserByEmail(ctx, email)
+	if err != nil {
+		return err
+	}
+	uid := u.ID
+	var cvPath *string
+	_ = db.Pool.QueryRow(ctx, `SELECT file_path FROM user_cv_analysis WHERE user_id = $1`, uid).Scan(&cvPath)
+	stmts := []string{
+		`DELETE FROM chat_message WHERE session_id IN (SELECT id FROM chat_sessions WHERE user_id = $1)`,
+		`DELETE FROM chat_sessions WHERE user_id = $1`,
+		`DELETE FROM user_skills WHERE user_id = $1`,
+		`DELETE FROM user_common_tasks WHERE user_id = $1`,
+		`DELETE FROM user_custom_tasks WHERE user_id = $1`,
+		`DELETE FROM user_cv_analysis WHERE user_id = $1`,
+		`DELETE FROM user_streak WHERE user_id = $1`,
+		`DELETE FROM user_student WHERE id = $1`,
+	}
+	for _, q := range stmts {
+		if _, err := db.Pool.Exec(ctx, q, uid); err != nil {
+			return err
+		}
+	}
+	if cvPath != nil && *cvPath != "" {
+		cvstorage.RemoveFile(*cvPath)
+	}
+	return nil
 }

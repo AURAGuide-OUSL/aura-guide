@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	auralifecoach "aura-backend/aura-life-coach-module"
@@ -74,6 +76,10 @@ func GetCVFeedback(ctx context.Context, email string) (*auralifecoach.FeedbackRe
 
 func ListCVs(ctx context.Context, email string) ([]auralifecoach.CVMeta, error) {
 	return dao.ListCVAnalysisMeta(ctx, email)
+}
+
+func GetCVFileForDownload(ctx context.Context, email string) (path, fileName string, err error) {
+	return dao.GetCVFileForDownload(ctx, email)
 }
 
 func jwtForAgentForwarding(ctx context.Context, r *http.Request) string {
@@ -156,6 +162,11 @@ func fallbackCVPlainText(fileName string, parseErr error) string {
 
 // AnalyzeCVPDF extracts text locally, then asks the FastAPI agent + Ollama to analyze and persist to user_cv_analysis.
 func AnalyzeCVPDF(ctx context.Context, r *http.Request) (*agentclient.CVAnalyzeResponse, error) {
+	email, ok := r.Context().Value(middleware.UserEmailKey).(string)
+	if !ok || strings.TrimSpace(email) == "" {
+		return nil, fmt.Errorf("authorization required")
+	}
+
 	data, fn, err := readPdfFromMultipart(r)
 	if err != nil {
 		return nil, err
@@ -171,8 +182,32 @@ func AnalyzeCVPDF(ctx context.Context, r *http.Request) (*agentclient.CVAnalyzeR
 		text = fallbackCVPlainText(fn, err)
 	}
 
-	return agentclient.PostCVAnalyze(ctx, token, agentclient.CVAnalyzeRequest{
+	res, err := agentclient.PostCVAnalyze(ctx, token, agentclient.CVAnalyzeRequest{
 		CVText:   text,
 		FileName: fn,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	if err := dao.PersistCVPDF(ctx, email, fn, data); err != nil {
+		log.Printf("persist cv pdf for %s: %v", email, err)
+	}
+
+	return res, nil
+}
+
+// ServeCVPDF streams the stored PDF for a user.
+func ServeCVPDF(ctx context.Context, email string, w http.ResponseWriter, r *http.Request) error {
+	path, name, err := dao.GetCVFileForDownload(ctx, email)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(path); err != nil {
+		return fmt.Errorf("cv file missing on disk")
+	}
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
+	http.ServeFile(w, r, path)
+	return nil
 }

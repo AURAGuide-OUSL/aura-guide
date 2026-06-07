@@ -78,6 +78,12 @@ function sortTasksForTab(tab: string, taskList: any[]): any[] {
   return copy;
 }
 
+function tomorrowISO() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
 export function TasksScreen({
   onNavigateCalendar,
   onRequestAgentTaskAnswer,
@@ -90,18 +96,16 @@ export function TasksScreen({
   const [showAddTaskCard, setShowAddTaskCard] = useState(false);
   const [newTask, setNewTask] = useState("");
   const [newStartDate, setNewStartDate] = useState(new Date().toISOString().slice(0, 10));
-  const [newEndDate, setNewEndDate] = useState(new Date().toISOString().slice(0, 10));
+  const [newEndDate, setNewEndDate] = useState(tomorrowISO());
+  const [editingTask, setEditingTask] = useState<any | null>(null);
+  const [editTaskName, setEditTaskName] = useState("");
+  const [editStartDate, setEditStartDate] = useState("");
+  const [editEndDate, setEditEndDate] = useState("");
   const safeDate = (value: any) => (typeof value === "string" ? value : "");
 
   const loadTasks = async () => {
     try {
       const data = await api.getTasks();
-      if (!data?.length) {
-        await api.generateTaskPlan();
-        const generated = await api.getTasks();
-        setTasks(Array.isArray(generated) ? generated : []);
-        return;
-      }
       setTasks(Array.isArray(data) ? data : []);
     } catch (error) {
       Alert.alert("Task loading failed", (error as Error).message);
@@ -130,8 +134,8 @@ export function TasksScreen({
       Alert.alert("Missing dates", "Start and end date are required.");
       return;
     }
-    if (newEndDate < newStartDate) {
-      Alert.alert("Invalid range", "End date should be equal to or after start date.");
+    if (newEndDate <= newStartDate) {
+      Alert.alert("Invalid range", "End date must be after start date.");
       return;
     }
     await api.addTask({
@@ -153,6 +157,33 @@ export function TasksScreen({
     }
     await api.updateTask(task.id, { status });
     await loadTasks();
+  };
+
+  const openEditTask = (task: any) => {
+    setEditingTask(task);
+    setEditTaskName(typeof task.task === "string" ? task.task : "");
+    setEditStartDate(safeDate(task.start_date_time).slice(0, 10));
+    setEditEndDate(safeDate(task.end_date_time).slice(0, 10) || tomorrowISO());
+  };
+
+  const saveEditedTask = async () => {
+    if (!editingTask) return;
+    if (!editTaskName.trim()) {
+      Alert.alert("Missing name", "Task name is required.");
+      return;
+    }
+    if (!editStartDate || !editEndDate || editEndDate <= editStartDate) {
+      Alert.alert("Invalid dates", "End date must be after start date.");
+      return;
+    }
+    await api.updateTask(editingTask.id, {
+      task: editTaskName.trim(),
+      start_date_time: `${editStartDate}T09:00:00.000Z`,
+      end_date_time: `${editEndDate}T18:00:00.000Z`,
+    });
+    setEditingTask(null);
+    await loadTasks();
+    Alert.alert("Updated", "Task saved.");
   };
 
   const deleteTaskPressed = async (task: any) => {
@@ -259,6 +290,31 @@ export function TasksScreen({
         </View>
       ) : null}
 
+      {editingTask ? (
+        <View style={styles.addTaskSheet}>
+          <View style={styles.addTaskToolbar}>
+            <Text style={styles.addTaskToolbarTitle}>Edit Task</Text>
+            <Pressable onPress={() => setEditingTask(null)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <Text style={styles.cancelLink}>Cancel</Text>
+            </Pressable>
+          </View>
+          <AppCard style={styles.addCard}>
+            <View style={commonStyles.stackSm}>
+              <InputField label="Task Name" placeholder="Task name" value={editTaskName} onChangeText={setEditTaskName} />
+              <View style={styles.dateInputRow}>
+                <View style={commonStyles.flexOne}>
+                  <InputField label="Start Date" placeholder="YYYY-MM-DD" value={editStartDate} onChangeText={setEditStartDate} />
+                </View>
+                <View style={commonStyles.flexOne}>
+                  <InputField label="End Date" placeholder="YYYY-MM-DD" value={editEndDate} onChangeText={setEditEndDate} />
+                </View>
+              </View>
+              <PrimaryButton label="Save changes" onPress={saveEditedTask} />
+            </View>
+          </AppCard>
+        </View>
+      ) : null}
+
       {shown.length === 0 ? (
         <AppCard style={styles.emptyCard}>
           <View style={styles.emptyIcon}>
@@ -292,16 +348,28 @@ export function TasksScreen({
                   <Badge label={statusLabel(task.status)} backgroundColor={palette.surfaceMuted} textColor={palette.muted} />
                 </View>
               </View>
-              <TouchableOpacity
-                activeOpacity={0.75}
-                onPress={() => void deleteTaskPressed(task)}
-                style={styles.deleteButton}
-                hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
-                accessibilityLabel="Delete task"
-                accessibilityRole="button"
-              >
-                <Ionicons name="trash-outline" size={18} color={palette.danger} />
-              </TouchableOpacity>
+              <View style={styles.cardActions}>
+                {task.is_custom ? (
+                  <TouchableOpacity
+                    activeOpacity={0.75}
+                    onPress={() => openEditTask(task)}
+                    style={styles.editButton}
+                    accessibilityLabel="Edit task"
+                  >
+                    <Ionicons name="create-outline" size={18} color={palette.primary} />
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity
+                  activeOpacity={0.75}
+                  onPress={() => void deleteTaskPressed(task)}
+                  style={styles.deleteButton}
+                  hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+                  accessibilityLabel="Delete task"
+                  accessibilityRole="button"
+                >
+                  <Ionicons name="trash-outline" size={18} color={palette.danger} />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View style={styles.progressSection}>
@@ -312,7 +380,7 @@ export function TasksScreen({
               <View style={styles.dateInfo}>
                 <Ionicons name="calendar-outline" size={14} color={palette.muted} />
                 <Text style={styles.dateText}>
-                  {safeDate(task.start_date_time).slice(0, 10)} → {safeDate(task.end_date_time).slice(0, 10) || "-"}
+                  {safeDate(task.start_date_time).slice(0, 10)} - {safeDate(task.end_date_time).slice(0, 10) || "-"}
                 </Text>
               </View>
             </View>
@@ -439,6 +507,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
+  },
+  cardActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  editButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: palette.chipBlue,
   },
   badges: {
     marginTop: 10,
