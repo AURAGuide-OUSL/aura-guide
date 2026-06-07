@@ -114,6 +114,7 @@ func main() {
 		r.Post("/aura-life-coach/cv/analyze", auraLifeCoachApi.AnalyzeCVHandler)
 		r.Get("/aura-life-coach/cv/feedback", auraLifeCoachApi.GetCVFeedbackHandler)
 		r.Get("/aura-life-coach/cv/list", auraLifeCoachApi.ListCVsHandler)
+		r.Get("/aura-life-coach/cv/download", auraLifeCoachApi.DownloadCVHandler)
 
 		r.Post("/aura-ethical-validator/answer", ethicsApi.ValidateAnswerHandler)
 		r.Get("/aura-ethical-validator/answer/status", ethicsApi.GetValidationStatusHandler)

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	auralifecoach "aura-backend/aura-life-coach-module"
+	"aura-backend/common/cvstorage"
 	"aura-backend/common/db"
 
 	"github.com/jackc/pgx/v5"
@@ -16,6 +17,7 @@ import (
 
 type CVAnalysisRow struct {
 	FileName     string
+	FilePath     string
 	UploadedAt   *time.Time
 	Strengths    []string
 	Weaknesses   []string
@@ -59,12 +61,12 @@ func GetCVAnalysisRow(ctx context.Context, email string) (*CVAnalysisRow, error)
 		return nil, err
 	}
 	row := db.Pool.QueryRow(ctx, `
-SELECT file_name, uploaded_at, strengths, weaknesses, improvements
+SELECT file_name, file_path, uploaded_at, strengths, weaknesses, improvements
 FROM user_cv_analysis WHERE user_id = $1`, userID,
 	)
 	var r CVAnalysisRow
 	var strengths, weaknesses, improvements any
-	if err := row.Scan(&r.FileName, &r.UploadedAt, &strengths, &weaknesses, &improvements); err != nil {
+	if err := row.Scan(&r.FileName, &r.FilePath, &r.UploadedAt, &strengths, &weaknesses, &improvements); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
@@ -94,4 +96,76 @@ func ListCVAnalysisMeta(ctx context.Context, email string) ([]auralifecoach.CVMe
 	return []auralifecoach.CVMeta{
 		{FileName: r.FileName, UploadedAt: at},
 	}, nil
+}
+
+// PersistCVPDF stores PDF bytes on disk and links them to the user's CV analysis row.
+func PersistCVPDF(ctx context.Context, email, fileName string, data []byte) error {
+	userID, err := lookupUserStudentID(ctx, email)
+	if err != nil {
+		return err
+	}
+	if old, _ := getCVFilePath(ctx, userID); old != "" {
+		cvstorage.RemoveFile(old)
+	}
+	path, err := cvstorage.SavePDF(userID, fileName, data)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `
+UPDATE user_cv_analysis
+SET file_path = $2,
+    file_size = $3,
+    file_name = COALESCE(NULLIF(trim($4), ''), file_name),
+    uploaded_at = COALESCE(uploaded_at, NOW())
+WHERE user_id = $1`, userID, path, int64(len(data)), fileName)
+	return err
+}
+
+// GetCVFileForDownload returns the on-disk path and display name for the user's CV PDF.
+func GetCVFileForDownload(ctx context.Context, email string) (path, displayName string, err error) {
+	userID, err := lookupUserStudentID(ctx, email)
+	if err != nil {
+		return "", "", err
+	}
+	var filePath, fileName *string
+	err = db.Pool.QueryRow(ctx, `
+SELECT file_path, file_name FROM user_cv_analysis WHERE user_id = $1`, userID,
+	).Scan(&filePath, &fileName)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", "", fmt.Errorf("no cv on file")
+		}
+		return "", "", err
+	}
+	if filePath == nil || strings.TrimSpace(*filePath) == "" {
+		return "", "", fmt.Errorf("cv file not stored")
+	}
+	name := "cv.pdf"
+	if fileName != nil && strings.TrimSpace(*fileName) != "" {
+		name = strings.TrimSpace(*fileName)
+	}
+	return strings.TrimSpace(*filePath), name, nil
+}
+
+func getCVFilePath(ctx context.Context, userID int) (string, error) {
+	var path *string
+	err := db.Pool.QueryRow(ctx, `SELECT file_path FROM user_cv_analysis WHERE user_id = $1`, userID).Scan(&path)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", nil
+		}
+		return "", err
+	}
+	if path == nil {
+		return "", nil
+	}
+	return strings.TrimSpace(*path), nil
+}
+
+// RemoveStoredCVFile deletes the on-disk PDF for a user if present.
+func RemoveStoredCVFile(ctx context.Context, userID int) {
+	path, _ := getCVFilePath(ctx, userID)
+	if path != "" {
+		cvstorage.RemoveFile(path)
+	}
 }

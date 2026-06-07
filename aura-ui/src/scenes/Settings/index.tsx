@@ -1,5 +1,5 @@
 import React from "react";
-import { ScrollView, StyleSheet, Switch, Text, View, Pressable } from "react-native";
+import { Alert, ScrollView, StyleSheet, Switch, Text, View, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { palette, commonStyles } from "../../theme";
 import { AppCard } from "../../components/AppCard";
@@ -12,13 +12,38 @@ export function SettingsScreen({
   onOpenTerms,
   onBack,
   onSignOut,
+  onDeleteAccount,
 }: {
   values: { notifications: boolean; darkMode: boolean; language: string };
   onChange: (next: { notifications: boolean; darkMode: boolean; language: string }) => void;
   onOpenTerms: () => void;
   onBack: () => void;
   onSignOut: () => void;
+  onDeleteAccount?: () => Promise<void>;
 }) {
+  const confirmDelete = () => {
+    Alert.alert(
+      "Delete account",
+      "This permanently removes your profile, tasks, scores, and chat history. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              try {
+                await onDeleteAccount?.();
+              } catch (e) {
+                Alert.alert("Delete failed", (e as Error).message);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <ScrollView contentContainerStyle={[styles.screenContent, { backgroundColor: palette.background }]}>
       <ScreenHeader title="Settings" subtitle="Preferences & account" onBack={onBack} />
@@ -88,6 +113,11 @@ export function SettingsScreen({
 
       <View style={styles.footer}>
         <PrimaryButton label="Sign Out" onPress={onSignOut} variant="danger" />
+        {onDeleteAccount ? (
+          <Pressable onPress={confirmDelete} style={styles.deleteAccountBtn}>
+            <Text style={styles.deleteAccountText}>Delete account</Text>
+          </Pressable>
+        ) : null}
         <Text style={styles.versionText}>Version 1.0.0 (AURA)</Text>
       </View>
     </ScrollView>
@@ -153,6 +183,15 @@ const styles = StyleSheet.create({
   footer: {
     marginTop: 12,
     gap: 16,
+  },
+  deleteAccountBtn: {
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  deleteAccountText: {
+    color: palette.danger,
+    fontWeight: "800",
+    fontSize: 15,
   },
   versionText: {
     textAlign: "center",

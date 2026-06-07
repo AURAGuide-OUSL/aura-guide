@@ -6,7 +6,7 @@ from typing import Any
 from psycopg.types.json import Json
 
 from app.db import get_conn
-from app.json_utils import as_str_list, extract_json_object
+from app.json_utils import as_str_list, clean_coach_question_text, extract_json_object
 from app.ollama_client import structured_completion
 from app.skills_repo import skill_id, status_id_by_name, upsert_user_skill_score
 
@@ -224,7 +224,7 @@ OUTPUT FORMAT:
                 "type, question_number, question (string).",
             )
             data = extract_json_object(raw2)
-        qtext = str(data.get("question") or "").strip()
+        qtext = clean_coach_question_text(str(data.get("question") or ""))
         if not qtext:
             raise ValueError("empty question")
         return {
@@ -410,7 +410,7 @@ OUTPUT FORMAT:
                 + "\n\nReturn ONLY JSON with type, question_number, question (string).",
             )
             data = extract_json_object(raw2)
-        qtext = str(data.get("question") or "").strip()
+        qtext = clean_coach_question_text(str(data.get("question") or ""))
         if not qtext:
             raise ValueError("empty reflection question")
         return {
@@ -511,13 +511,43 @@ def _parse_task_times(
 
     if end <= start:
         end = start + timedelta(hours=24)
+    # Ensure at least one full calendar day between start and due when same-day parsed
+    if end.date() <= start.date():
+        end = start + timedelta(days=1, hours=min(hours, 8))
     return start, end
+
+
+def pick_next_technical_skill(user_id: int) -> str:
+    """Pick the technical skill used least often in agent-assigned tasks (fair rotation)."""
+    counts = {name: 0 for name in TECH_SKILLS}
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+SELECT s.name, COUNT(*)::int AS cnt
+FROM user_common_tasks ucm
+JOIN common_tasks ct ON ct.id = ucm.common_task_id
+JOIN skills s ON s.id = ct.skill_id
+WHERE ucm.user_id = %s AND s.name = ANY(%s)
+GROUP BY s.name
+""",
+            (user_id, TECH_SKILLS),
+        ).fetchall()
+        for r in rows:
+            n = r["name"]
+            if n in counts:
+                counts[n] = int(r["cnt"] or 0)
+    min_count = min(counts.values())
+    for name in TECH_SKILLS:
+        if counts[name] == min_count:
+            return name
+    return TECH_SKILLS[0]
 
 
 async def generate_agent_task(email: str) -> dict[str, Any]:
     row = fetch_user_learning_row(email)
     uid = int(row["user_id"])
     recent = recent_skills_summary(uid)
+    required_skill = pick_next_technical_skill(uid)
     now_iso = datetime.now(timezone.utc).isoformat()
 
     skill_levels = (
@@ -532,6 +562,7 @@ ABSOLUTE OUTPUT RULE:
     user = f"""INPUTS from DB about this learner:
 
 USER_GOAL: {row['goal_name']}
+REQUIRED_SKILL (you MUST use this skill): {required_skill}
 SKILL_LEVELS: {skill_levels}
 RECENT_SKILLS_USED: {recent}
 CURRENT_TIME: {now_iso}
@@ -545,15 +576,15 @@ AVAILABLE SKILLS:
 - Git Concept Knowledge
 
 TASK:
-Generate ONE task using ONLY ONE skill.
+Generate ONE task using ONLY REQUIRED_SKILL above, tailored to USER_GOAL career track.
 
-The stored "task" string must describe ONE assignment that the user answers only by typing plain text in the app
-(no uploads, repos, compilers, or external tools required unless you embed a SHORT snippet/constraints IN the text).
+The stored "task" string must describe ONE assignment that the user answers only by typing plain text in the chat
+(2–8 sentences). No UI design, no building apps, no deployment, no file uploads, no live coding.
 
 Write descriptive, CLEAR instructions:
-- Brief scenario or context (what system, feature, or problem they are thinking about).
-- Exactly what they must produce in writing (e.g. explain, compare, trace, justify, list steps, predict behavior).
-- Explicit success criteria: label sections you expect (e.g. Summary / Reasoning / Trade-offs) so answers are easy to grade.
+- Brief workplace scenario aligned with USER_GOAL.
+- Exactly what they must produce in writing (explain, trace, compare, justify, list steps).
+- Explicit success criteria so answers are easy to grade from text alone.
 
 --------------------------------------------------------------
 FAIRNESS RULE (IMPORTANT)
@@ -605,7 +636,10 @@ Field requirements:
     task_txt = str(data.get("task") or "").strip()
     skill_name = str(data.get("skill") or "").strip()
     if skill_name not in TECH_SKILLS:
-        skill_name = "Code Understanding"
+        skill_name = required_skill
+    # Enforce fair rotation when model ignores REQUIRED_SKILL
+    if skill_name != required_skill:
+        skill_name = required_skill
 
     start, end = _parse_task_times(
         row["availability_type"],

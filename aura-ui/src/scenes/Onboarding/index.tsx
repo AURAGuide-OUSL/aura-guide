@@ -115,7 +115,13 @@ export function OnboardingScreen({
               <Picker.Item label="Beginner" value="Beginner" />
               <Picker.Item label="Intermediate" value="Intermediate" />
               <Picker.Item label="Advanced" value="Advanced" />
+              <Picker.Item label="Not sure yet — discover in AI Coach" value="Unsure" />
             </PickerField>
+            {softSkillLevel === "Unsure" ? (
+              <Text style={styles.unsureHint}>
+                After signup, open AI Coach - “Help to improve my communication skills” for a guided session that informs your soft-skill level.
+              </Text>
+            ) : null}
             <PickerField label="Availability type" selectedValue={availabilityType} onValueChange={(itemValue) => setAvailabilityType(itemValue)}>
               <Picker.Item label="Select type" value="" />
               <Picker.Item label="Daily" value="daily" />
@@ -189,5 +195,11 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: "row",
     gap: 12,
+  },
+  unsureHint: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: palette.muted,
+    fontWeight: "600",
   },
 });

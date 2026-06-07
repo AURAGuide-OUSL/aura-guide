@@ -20,6 +20,7 @@ import { Message } from "../../types";
 import { api } from "../../api/api";
 import { screenPadding } from "../../styles/screenStyles";
 import { prettifyCvLine } from "../../utils/cvFeedback";
+import { formatCoachQuestion } from "../../utils/coachText";
 
 const PROMPTS = [
   {
@@ -270,7 +271,7 @@ export function AICoachScreen({
         questionText: q.question,
         awaitingFeedback: true,
       });
-      pushAura(`**Question ${q.question_number}**\n\n${q.question}`, "Interview");
+      pushAura(formatCoachQuestion("Question", q.question_number, q.question), "Interview");
     } catch (e) {
       pushAura(`Interview could not start: ${(e as Error).message}`, "Error");
       resetToHome();
@@ -320,7 +321,7 @@ export function AICoachScreen({
         questionText: q.question,
         awaitingFeedback: true,
       });
-      pushAura(`**Reflection ${q.question_number}**\n\n${q.question}`, "Reflection");
+      pushAura(formatCoachQuestion("Reflection", q.question_number, q.question), "Reflection");
     } catch (e) {
       pushAura(`Reflection could not start: ${(e as Error).message}`, "Error");
       resetToHome();
@@ -344,7 +345,7 @@ export function AICoachScreen({
         questionText: q.question,
         awaitingFeedback: true,
       });
-      pushAura(`**Reflection ${q.question_number}**\n\n${q.question}`, "Reflection");
+      pushAura(formatCoachQuestion("Reflection", q.question_number, q.question), "Reflection");
     } catch (e) {
       pushAura(`Next reflection failed: ${(e as Error).message}`, "Error");
     } finally {
@@ -488,7 +489,7 @@ export function AICoachScreen({
         questionText: q.question,
         awaitingFeedback: true,
       });
-      pushAura(`**Question ${q.question_number}**\n\n${q.question}`, "Interview");
+      pushAura(formatCoachQuestion("Question", q.question_number, q.question), "Interview");
     } catch (e) {
       pushAura(`Next question failed: ${(e as Error).message}`, "Error");
     } finally {
