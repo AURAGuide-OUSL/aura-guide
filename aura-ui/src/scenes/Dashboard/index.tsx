@@ -161,15 +161,24 @@ export function DashboardScreen({
         </AppCard>
       </View>
 
-      <AppCard style={styles.goalCard}>
-        <View style={styles.goalHeader}>
-          <View style={styles.goalIcon}>
-            <Ionicons name="rocket" size={20} color={palette.primary} />
+      <Pressable onPress={() => onNavigate("careerTrack")} style={({ pressed }) => pressed && styles.quickPressed}>
+        <AppCard style={styles.goalCard}>
+          <View style={styles.goalHeader}>
+            <View style={styles.goalIcon}>
+              <Ionicons name="rocket" size={20} color={palette.primary} />
+            </View>
+            <Text style={styles.eyebrow}>Career Track</Text>
           </View>
-          <Text style={styles.eyebrow}>Career Track</Text>
-        </View>
-        <Text style={styles.goalTitle}>{user.goal || "Set your goal in Profile"}</Text>
-      </AppCard>
+          <Text style={styles.goalTitle}>{user.goal || "Set your goal in Profile"}</Text>
+          {user.recommendation?.trim() ? (
+            <Text style={styles.goalHint} numberOfLines={2}>
+              {user.recommendation}
+            </Text>
+          ) : (
+            <Text style={styles.goalHint}>Tap to view your roadmap and career recommendations</Text>
+          )}
+        </AppCard>
+      </Pressable>
 
       <AppCard style={styles.coachCard}>
         <View style={styles.coachHeader}>
@@ -404,6 +413,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "800",
     color: palette.text,
+  },
+  goalHint: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 19,
+    color: palette.muted,
+    fontWeight: "600",
   },
   coachCard: {
     backgroundColor: palette.primaryDark,

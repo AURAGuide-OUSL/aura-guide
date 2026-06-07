@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	goaldao "aura-backend/goal-module/dao"
 	"aura-backend/common/skillsmetrics"
 	"aura-backend/user-module"
 	"aura-backend/user-module/dao"
@@ -26,6 +27,11 @@ func GetUserProfile(ctx context.Context, email string) (*user.UserStudent, error
 	u.SkillScorePercent = &p
 	u.SkillAverage = &avg
 	u.SkillReadinessLabel = &label
+
+	if rec, err := goaldao.UpdateCareerRecommendationIfReady(ctx, u.ID, u.GoalID, "", label, avg); err == nil && rec != "" {
+		u.Recommendation = &rec
+	}
+
 	return u, nil
 }
 
@@ -48,7 +54,8 @@ func ClearSession(w http.ResponseWriter) {
 		Expires:  time.Unix(0, 0),
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   false,
 		Path:     "/",
+		SameSite: http.SameSiteLaxMode,
 	})
 }

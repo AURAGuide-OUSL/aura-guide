@@ -18,10 +18,11 @@ type GoalSkillProgress struct {
 }
 
 type GoalSummaryResponse struct {
-	CompletedTasks       int                 `json:"completed_tasks"`
-	CareerTitle          string              `json:"career_title"`
-	Skills               []GoalSkillProgress `json:"skills"`
-	AuraScorePercent     int                 `json:"aura_score_percent"`
-	SkillAverage         float64             `json:"skill_average"`
-	SkillReadinessLabel  string              `json:"skill_readiness_label"`
+	CompletedTasks      int                 `json:"completed_tasks"`
+	CareerTitle         string              `json:"career_title"`
+	Skills              []GoalSkillProgress `json:"skills"`
+	AuraScorePercent    int                 `json:"aura_score_percent"`
+	SkillAverage        float64             `json:"skill_average"`
+	SkillReadinessLabel string              `json:"skill_readiness_label"`
+	Recommendation      string              `json:"recommendation,omitempty"`
 }

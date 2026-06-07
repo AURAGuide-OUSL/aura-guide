@@ -57,6 +57,17 @@ func GetGoalSummaryByEmail(ctx context.Context, email string) (*goal.GoalSummary
 	result.SkillAverage = am.Average
 	result.SkillReadinessLabel = am.ReadinessLabel
 
+	rec, _ := UpdateCareerRecommendationIfReady(ctx, userID, goalID, result.CareerTitle, result.SkillReadinessLabel, am.Average)
+	if rec != "" {
+		result.Recommendation = rec
+	} else {
+		var stored *string
+		_ = db.Pool.QueryRow(ctx, `SELECT recommendation FROM user_student WHERE id = $1`, userID).Scan(&stored)
+		if stored != nil {
+			result.Recommendation = strings.TrimSpace(*stored)
+		}
+	}
+
 	if goalID == nil {
 		return result, nil
 	}

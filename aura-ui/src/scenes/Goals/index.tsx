@@ -16,6 +16,7 @@ export function GoalsScreen() {
     career_title: "",
     aura_score_percent: 0,
     skill_readiness_label: "",
+    recommendation: "",
   });
 
   useEffect(() => {
@@ -29,6 +30,7 @@ export function GoalsScreen() {
             career_title: "",
             aura_score_percent: 0,
             skill_readiness_label: "",
+            recommendation: "",
           },
         ),
       )
@@ -39,9 +41,12 @@ export function GoalsScreen() {
           career_title: "",
           aura_score_percent: 0,
           skill_readiness_label: "",
+          recommendation: "",
         }),
       );
   }, []);
+
+  const industryReady = (summary.skill_readiness_label || "").toLowerCase().includes("industry");
 
   const technicalSkills = useMemo(
     () => (summary.skills || []).filter((skill: any) => (skill.category_name || "").toLowerCase() === "technical"),
@@ -96,6 +101,13 @@ export function GoalsScreen() {
           {summary.skill_readiness_label ? ` · ${summary.skill_readiness_label}` : ""}
         </Text>
       </AppCard>
+
+      {industryReady && summary.recommendation ? (
+        <AppCard style={styles.recCard}>
+          <Text style={styles.recEyebrow}>Career path recommendation</Text>
+          <Text style={styles.recText}>{summary.recommendation}</Text>
+        </AppCard>
+      ) : null}
 
       <SkillSection title="Technical Skills" subtitle="Core competencies for your role" tone="tech" skills={technicalSkills} empty="No technical skills found for this goal." />
 
@@ -242,6 +254,23 @@ const styles = StyleSheet.create({
   heroAuraEm: {
     fontWeight: "800",
     color: "#FFFFFF",
+  },
+  recCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: palette.success,
+  },
+  recEyebrow: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: palette.muted,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+  recText: {
+    color: palette.text,
+    lineHeight: 22,
+    fontWeight: "600",
   },
   heroDivider: {
     width: 1,

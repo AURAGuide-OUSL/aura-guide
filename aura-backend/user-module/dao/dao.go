@@ -87,6 +87,8 @@ func DeleteUserByEmail(ctx context.Context, email string) error {
 		`DELETE FROM user_skills WHERE user_id = $1`,
 		`DELETE FROM user_common_tasks WHERE user_id = $1`,
 		`DELETE FROM user_custom_tasks WHERE user_id = $1`,
+		`DELETE FROM user_notification WHERE user_id = $1`,
+		`DELETE FROM user_badge WHERE user_id = $1`,
 		`DELETE FROM user_cv_analysis WHERE user_id = $1`,
 		`DELETE FROM user_streak WHERE user_id = $1`,
 		`DELETE FROM user_student WHERE id = $1`,
@@ -96,6 +98,7 @@ func DeleteUserByEmail(ctx context.Context, email string) error {
 			return err
 		}
 	}
+	_, _ = db.Pool.Exec(ctx, `DELETE FROM user_cv WHERE user_id = $1`, uid)
 	if cvPath != nil && *cvPath != "" {
 		cvstorage.RemoveFile(*cvPath)
 	}

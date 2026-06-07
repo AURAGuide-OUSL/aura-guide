@@ -5,10 +5,10 @@ import { StyleSheet, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 
-import { palette } from "./src/theme";
+import { ThemeProvider } from "./src/theme/ThemeContext";
 import { Route, TabRoute, UserProfile } from "./src/types";
 import { initialProfile, tabRoutes } from "./src/constants";
-import { notificationSeed } from "./src-native/mockData";
+import { NotificationItem } from "./src/constants/appData";
 
 // Components
 import { BottomTabs } from "./src/components/BottomTabs";
@@ -44,7 +44,7 @@ export default function App() {
   const [tab, setTab] = useState<TabRoute>("dashboard");
   const [user, setUser] = useState<UserProfile>(initialProfile);
   const [tempPassword, setTempPassword] = useState("");
-  const [notifications, setNotifications] = useState(notificationSeed);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [settings, setSettings] = useState({
     notifications: true,
     darkMode: false,
@@ -57,6 +57,31 @@ export default function App() {
   const clearPendingAgentTask = useCallback(() => {
     setPendingAgentTask(undefined);
   }, []);
+
+  useEffect(() => {
+    AsyncStorage.getItem("aura_dark_mode").then((v) => {
+      if (v === "1") {
+        setSettings((s) => ({ ...s, darkMode: true }));
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.setItem("aura_dark_mode", settings.darkMode ? "1" : "0");
+  }, [settings.darkMode]);
+
+  const loadNotifications = useCallback(async () => {
+    if (!settings.notifications) {
+      setNotifications([]);
+      return;
+    }
+    try {
+      const items = await api.listNotifications();
+      setNotifications(Array.isArray(items) ? items : []);
+    } catch {
+      setNotifications([]);
+    }
+  }, [settings.notifications]);
 
   const fetchProfile = async () => {
     try {
@@ -89,6 +114,7 @@ export default function App() {
         recommendation: profileData.recommendation ?? "",
         joinedDate: initialProfile.joinedDate,
       });
+      void loadNotifications();
       return true;
     } catch (err) {
       return false;
@@ -101,6 +127,7 @@ export default function App() {
       setIsReturningUser(returning);
       const ok = await fetchProfile();
       if (ok) {
+        await api.recordCheckIn().catch(() => {});
         setRoute("dashboard");
       } else {
         setRoute("signin");
@@ -126,6 +153,7 @@ export default function App() {
       await api.login({ email: normalizedEmail, password: passwordValue });
       const ok = await fetchProfile();
       if (ok) {
+        await api.recordCheckIn().catch(() => {});
         await AsyncStorage.setItem("aura_returning_user", "1");
         setIsReturningUser(true);
         setRoute("dashboard");
@@ -147,6 +175,7 @@ export default function App() {
       await api.login({ email: profile.email, password: profile.password });
       const ok = await fetchProfile();
       if (ok) {
+        await api.recordCheckIn().catch(() => {});
         setIsReturningUser(false);
         setRoute("dashboard");
       }
@@ -157,14 +186,21 @@ export default function App() {
 
   const handleSignOut = async () => {
     await api.logout();
+    setUser(initialProfile);
+    setNotifications([]);
     setRoute("signin");
     setTab("dashboard");
   };
 
-  useEffect(() => {
-    const { setTheme } = require("./src/theme");
-    setTheme(settings.darkMode);
-  }, [settings.darkMode]);
+  const handleDeleteAccount = async () => {
+    await api.deleteAccount();
+    setUser(initialProfile);
+    setNotifications([]);
+    setPendingAgentTask(undefined);
+    setIsReturningUser(false);
+    setRoute("signin");
+    setTab("dashboard");
+  };
 
   const activeRoute = tabRoutes.includes(route as any) ? tab : route;
   const appBg = settings.darkMode ? "#0F172A" : "#F8FAFC";
@@ -252,11 +288,7 @@ export default function App() {
             }}
             onBack={() => setRoute("profile")}
             onSignOut={handleSignOut}
-            onDeleteAccount={async () => {
-              await api.deleteAccount();
-              setRoute("signin");
-              setTab("dashboard");
-            }}
+            onDeleteAccount={handleDeleteAccount}
           />
         );
       case "notifications":
@@ -264,13 +296,17 @@ export default function App() {
           <NotificationsScreen
             notifications={notifications}
             onBack={() => setRoute("dashboard")}
-            onMarkAllRead={() => setNotifications((n) => n.map((item) => ({ ...item, read: true })))}
+            onRefresh={loadNotifications}
+            onMarkAllRead={async () => {
+              await api.markAllNotificationsRead().catch(() => {});
+              setNotifications((n) => n.map((item) => ({ ...item, read: true })));
+            }}
           />
         );
       case "calendar":
         return <CalendarScreen onBack={() => setRoute("dashboard")} />;
       case "careerTrack":
-        return <CareerTrackScreen onBack={() => setRoute("dashboard")} />;
+        return <CareerTrackScreen onBack={() => setRoute("dashboard")} user={user} />;
       case "terms":
         return <TermsScreen onBack={() => setRoute(termsBackRoute)} />;
       default:
@@ -282,13 +318,15 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <View style={styles.container}>
-        <StatusBar style={settings.darkMode ? "light" : "dark"} />
-        <SafeAreaView style={[styles.safeArea, { backgroundColor: appBg }]} edges={["top", "left", "right"]}>
-          {renderContent()}
-        </SafeAreaView>
-        {showTabs && <BottomTabs current={tab} onNavigate={(route: TabRoute) => setTab(route)} />}
-      </View>
+      <ThemeProvider isDark={settings.darkMode}>
+        <View style={styles.container}>
+          <StatusBar style={settings.darkMode ? "light" : "dark"} />
+          <SafeAreaView style={[styles.safeArea, { backgroundColor: appBg }]} edges={["top", "left", "right"]}>
+            {renderContent()}
+          </SafeAreaView>
+          {showTabs && <BottomTabs current={tab} onNavigate={(route: TabRoute) => setTab(route)} />}
+        </View>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

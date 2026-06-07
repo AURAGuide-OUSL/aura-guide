@@ -140,8 +140,8 @@ func GetDashboardSummary(ctx context.Context, email string) (*progress.Dashboard
 }
 
 func upsertAndGetDayStreak(ctx context.Context, userID int) (int, error) {
-	now := time.Now()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	now := time.Now().UTC()
+	today := utcDay(now)
 	yesterday := today.AddDate(0, 0, -1)
 
 	var streakID int
@@ -152,7 +152,6 @@ func upsertAndGetDayStreak(ctx context.Context, userID int) (int, error) {
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return 0, err
 		}
-		// no row yet
 		err = db.Pool.QueryRow(ctx, `INSERT INTO user_streak (user_id, number_of_days, last_updated) VALUES ($1, 1, $2) RETURNING number_of_days`, userID, now).Scan(&numberOfDays)
 		if err != nil {
 			return 0, err
@@ -160,7 +159,7 @@ func upsertAndGetDayStreak(ctx context.Context, userID int) (int, error) {
 		return numberOfDays, nil
 	}
 
-	lastDay := time.Date(lastUpdated.Year(), lastUpdated.Month(), lastUpdated.Day(), 0, 0, 0, 0, lastUpdated.Location())
+	lastDay := utcDay(lastUpdated.UTC())
 	switch {
 	case lastDay.Equal(today):
 		return numberOfDays, nil
@@ -171,6 +170,33 @@ func upsertAndGetDayStreak(ctx context.Context, userID int) (int, error) {
 	}
 
 	if _, err := db.Pool.Exec(ctx, `UPDATE user_streak SET number_of_days = $1, last_updated = $2 WHERE id = $3`, numberOfDays, now, streakID); err != nil {
+		return 0, err
+	}
+	return numberOfDays, nil
+}
+
+func utcDay(t time.Time) time.Time {
+	u := t.UTC()
+	return time.Date(u.Year(), u.Month(), u.Day(), 0, 0, 0, 0, time.UTC)
+}
+
+// RecordDailyLoginByEmail increments the login streak for the authenticated user.
+func RecordDailyLoginByEmail(ctx context.Context, email string) (int, error) {
+	var userID int
+	if err := db.Pool.QueryRow(ctx, `SELECT id FROM user_student WHERE lower(trim(email)) = lower(trim($1))`, email).Scan(&userID); err != nil {
+		return 0, err
+	}
+	return upsertAndGetDayStreak(ctx, userID)
+}
+
+// GetDayStreak returns the current streak without modifying it.
+func GetDayStreak(ctx context.Context, userID int) (int, error) {
+	var numberOfDays int
+	err := db.Pool.QueryRow(ctx, `SELECT number_of_days FROM user_streak WHERE user_id = $1`, userID).Scan(&numberOfDays)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, nil
+		}
 		return 0, err
 	}
 	return numberOfDays, nil

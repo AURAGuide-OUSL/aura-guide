@@ -36,6 +36,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS gsm_goal_skill_unique ON goal_skill_matrix (go
 CREATE UNIQUE INDEX IF NOT EXISTS user_skills_user_skill_unique ON user_skills (user_id, skill_id);
 ALTER TABLE user_cv_analysis ADD COLUMN IF NOT EXISTS file_path TEXT;
 ALTER TABLE user_cv_analysis ADD COLUMN IF NOT EXISTS file_size BIGINT;
+ALTER TABLE user_notification ADD COLUMN IF NOT EXISTS title VARCHAR(255);
+ALTER TABLE user_notification ADD COLUMN IF NOT EXISTS notification_type VARCHAR(64) DEFAULT 'reminder';
 `)
 	return err
 }

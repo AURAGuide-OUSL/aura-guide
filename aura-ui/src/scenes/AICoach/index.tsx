@@ -365,7 +365,22 @@ export function AICoachScreen({
     const content = input.trim();
     if (!content) return;
 
+    const ethicsOk = async () => {
+      try {
+        const ethics = await api.validateEthicalAnswer(content);
+        if (ethics.status === "unethical") {
+          pushAura(ethics.message, "Review");
+          return false;
+        }
+      } catch (e) {
+        pushAura(`Ethical check failed: ${(e as Error).message}`, "Error");
+        return false;
+      }
+      return true;
+    };
+
     if (phase.kind === "task_answer") {
+      if (!(await ethicsOk())) return;
       pushUser(content);
       setInput("");
       setIsTyping(true);
@@ -391,6 +406,7 @@ export function AICoachScreen({
     }
 
     if (phase.kind === "interview" && phase.awaitingFeedback) {
+      if (!(await ethicsOk())) return;
       pushUser(content);
       setInput("");
       setIsTyping(true);
@@ -420,6 +436,7 @@ export function AICoachScreen({
     }
 
     if (phase.kind === "reflection" && phase.awaitingFeedback) {
+      if (!(await ethicsOk())) return;
       pushUser(content);
       setInput("");
       setIsTyping(true);
@@ -449,6 +466,7 @@ export function AICoachScreen({
     }
 
     if (phase.kind === "communication") {
+      if (!(await ethicsOk())) return;
       pushUser(content);
       setInput("");
       setIsTyping(true);
