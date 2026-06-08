@@ -20,6 +20,7 @@ import { Message } from "../../types";
 import { api } from "../../api/api";
 import { screenPadding } from "../../styles/screenStyles";
 import { prettifyCvLine } from "../../utils/cvFeedback";
+import { formatCoachQuestion } from "../../utils/coachText";
 
 const PROMPTS = [
   {
@@ -270,7 +271,7 @@ export function AICoachScreen({
         questionText: q.question,
         awaitingFeedback: true,
       });
-      pushAura(`**Question ${q.question_number}**\n\n${q.question}`, "Interview");
+      pushAura(formatCoachQuestion("Question", q.question_number, q.question), "Interview");
     } catch (e) {
       pushAura(`Interview could not start: ${(e as Error).message}`, "Error");
       resetToHome();
@@ -320,7 +321,7 @@ export function AICoachScreen({
         questionText: q.question,
         awaitingFeedback: true,
       });
-      pushAura(`**Reflection ${q.question_number}**\n\n${q.question}`, "Reflection");
+      pushAura(formatCoachQuestion("Reflection", q.question_number, q.question), "Reflection");
     } catch (e) {
       pushAura(`Reflection could not start: ${(e as Error).message}`, "Error");
       resetToHome();
@@ -344,7 +345,7 @@ export function AICoachScreen({
         questionText: q.question,
         awaitingFeedback: true,
       });
-      pushAura(`**Reflection ${q.question_number}**\n\n${q.question}`, "Reflection");
+      pushAura(formatCoachQuestion("Reflection", q.question_number, q.question), "Reflection");
     } catch (e) {
       pushAura(`Next reflection failed: ${(e as Error).message}`, "Error");
     } finally {
@@ -364,7 +365,22 @@ export function AICoachScreen({
     const content = input.trim();
     if (!content) return;
 
+    const ethicsOk = async () => {
+      try {
+        const ethics = await api.validateEthicalAnswer(content);
+        if (ethics.status === "unethical") {
+          pushAura(ethics.message, "Review");
+          return false;
+        }
+      } catch (e) {
+        pushAura(`Ethical check failed: ${(e as Error).message}`, "Error");
+        return false;
+      }
+      return true;
+    };
+
     if (phase.kind === "task_answer") {
+      if (!(await ethicsOk())) return;
       pushUser(content);
       setInput("");
       setIsTyping(true);
@@ -390,6 +406,7 @@ export function AICoachScreen({
     }
 
     if (phase.kind === "interview" && phase.awaitingFeedback) {
+      if (!(await ethicsOk())) return;
       pushUser(content);
       setInput("");
       setIsTyping(true);
@@ -419,6 +436,7 @@ export function AICoachScreen({
     }
 
     if (phase.kind === "reflection" && phase.awaitingFeedback) {
+      if (!(await ethicsOk())) return;
       pushUser(content);
       setInput("");
       setIsTyping(true);
@@ -448,6 +466,7 @@ export function AICoachScreen({
     }
 
     if (phase.kind === "communication") {
+      if (!(await ethicsOk())) return;
       pushUser(content);
       setInput("");
       setIsTyping(true);
@@ -488,7 +507,7 @@ export function AICoachScreen({
         questionText: q.question,
         awaitingFeedback: true,
       });
-      pushAura(`**Question ${q.question_number}**\n\n${q.question}`, "Interview");
+      pushAura(formatCoachQuestion("Question", q.question_number, q.question), "Interview");
     } catch (e) {
       pushAura(`Next question failed: ${(e as Error).message}`, "Error");
     } finally {

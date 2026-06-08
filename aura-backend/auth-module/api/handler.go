@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"aura-backend/auth-module/service"
+	progressdao "aura-backend/progress-module/dao"
 )
 
 type AuthRequest struct {
@@ -121,6 +122,11 @@ func signin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
+	}
+
+	if _, streakErr := progressdao.RecordDailyLoginByEmail(r.Context(), req.Email); streakErr != nil {
+		// non-fatal — login still succeeds
+		_ = streakErr
 	}
 
 	http.SetCookie(w, &http.Cookie{

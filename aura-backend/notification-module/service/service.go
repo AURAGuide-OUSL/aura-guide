@@ -14,3 +14,11 @@ func GetDailyTaskReminder(ctx context.Context, email string) (*notification.Resp
 func GetMotivationalQuote() notification.Response {
 	return dao.GetMotivationalQuote()
 }
+
+func ListNotifications(ctx context.Context, email string) ([]notification.Item, error) {
+	return dao.ListNotificationsByEmail(ctx, email)
+}
+
+func MarkAllRead(ctx context.Context, email string) error {
+	return dao.MarkAllRead(ctx, email)
+}

@@ -79,6 +79,57 @@ export const api = {
     if (!response.ok) throw new Error(await response.text());
     return response.json();
   },
+  async deleteAccount() {
+    const response = await fetch(`${API_BASE_URL}/users/profile/me`, {
+      method: "DELETE",
+      headers: await authHeaders(false),
+    });
+    if (!response.ok) {
+      const msg = (await response.text()).trim() || "Delete failed";
+      throw new Error(msg);
+    }
+    await AsyncStorage.removeItem("auth_token");
+    await AsyncStorage.removeItem("aura_returning_user");
+    await AsyncStorage.removeItem("aura_dark_mode");
+    try {
+      return await response.json();
+    } catch {
+      return { message: "Profile deleted successfully" };
+    }
+  },
+  async recordCheckIn() {
+    const response = await fetch(`${API_BASE_URL}/progress/check-in`, {
+      method: "POST",
+      headers: await authHeaders(false),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json() as Promise<{ day_streak: number }>;
+  },
+  async validateEthicalAnswer(answer: string) {
+    const response = await fetch(`${API_BASE_URL}/aura-ethical-validator/answer`, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify({ answer }),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json() as Promise<{ status: string; message: string }>;
+  },
+  async listNotifications() {
+    const response = await fetch(`${API_BASE_URL}/notification/list`, {
+      method: "GET",
+      headers: await authHeaders(false),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
+  async markAllNotificationsRead() {
+    const response = await fetch(`${API_BASE_URL}/notification/mark-all-read`, {
+      method: "POST",
+      headers: await authHeaders(false),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
   async getCareerPath() {
     const response = await fetch(`${API_BASE_URL}/user/careerPath`, {
       method: "GET",
@@ -196,6 +247,43 @@ export const api = {
     });
     if (!response.ok) throw new Error(await response.text());
     return response.json();
+  },
+  async downloadCV() {
+    const token = await AsyncStorage.getItem("auth_token");
+    if (!token) throw new Error("No auth token found");
+    const response = await fetch(`${API_BASE_URL}/aura-life-coach/cv/download`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+      ...(Platform.OS === "web" ? { credentials: "include" as RequestCredentials } : {}),
+    });
+    if (!response.ok) {
+      let msg = await response.text();
+      try {
+        const j = JSON.parse(msg);
+        if (j?.error) msg = j.error;
+      } catch {
+        /* plain text */
+      }
+      throw new Error(msg || "Download failed");
+    }
+    const blob = await response.blob();
+    const disp = response.headers.get("Content-Disposition") || "";
+    const match = /filename="?([^";]+)"?/i.exec(disp);
+    const fileName = (match?.[1] || "cv.pdf").trim();
+
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      return { fileName };
+    }
+
+    throw new Error("CV download is available on web. Open Profile in your browser to save the PDF.");
   },
   async getGoalSummary() {
     const response = await fetch(`${API_BASE_URL}/goals/summary`, {

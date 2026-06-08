@@ -1,4 +1,5 @@
 import json
+import re
 
 
 def _strip_markdown_fences(text: str) -> str:
@@ -67,6 +68,23 @@ def extract_json_object(text: str) -> dict:
     if not chunk:
         raise ValueError("unbalanced JSON braces")
     return json.loads(chunk)
+
+
+def clean_coach_question_text(text: str) -> str:
+    """Normalize interview/reflection question text for chat display."""
+    t = _strip_markdown_fences((text or "").strip())
+    if t.startswith("{"):
+        try:
+            data = extract_json_object(t)
+            q = data.get("question")
+            if q is not None:
+                t = str(q).strip()
+        except Exception:
+            pass
+    t = re.sub(r"\*\*([^*]+)\*\*", r"\1", t)
+    t = re.sub(r"^#+\s*", "", t, flags=re.MULTILINE)
+    t = re.sub(r"^[`\"']+|[`\"']+$", "", t.strip())
+    return t.strip()
 
 
 def coerce_cv_feedback_line(item: object) -> str:

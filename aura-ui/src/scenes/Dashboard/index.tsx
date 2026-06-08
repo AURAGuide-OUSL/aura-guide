@@ -51,11 +51,13 @@ function LinearQuickIcon({
 
 export function DashboardScreen({
   user,
+  isReturningUser = true,
   onNavigate,
   onNavigateTab,
   onSignOut,
 }: {
   user: UserProfile;
+  isReturningUser?: boolean;
   onNavigate: (route: Route) => void;
   onNavigateTab?: (tab: TabRoute) => void;
   onSignOut: () => void;
@@ -112,8 +114,9 @@ export function DashboardScreen({
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[screenStyles.scrollContent, styles.screenRoot]}>
+      {/*<Text style={styles.appTitle}>AURA Guide – Your Personalized Career Coach</Text>*/}
       <ScreenHeader
-        title={`Welcome back,\n${name}!`}
+        title={isReturningUser ? `Welcome back,\n${name}!` : `Welcome,\n${name}!`}
         subtitle={formatToday()}
         leftAction={
           <View style={styles.headerLogo}>
@@ -158,15 +161,24 @@ export function DashboardScreen({
         </AppCard>
       </View>
 
-      <AppCard style={styles.goalCard}>
-        <View style={styles.goalHeader}>
-          <View style={styles.goalIcon}>
-            <Ionicons name="rocket" size={20} color={palette.primary} />
+      <Pressable onPress={() => onNavigate("careerTrack")} style={({ pressed }) => pressed && styles.quickPressed}>
+        <AppCard style={styles.goalCard}>
+          <View style={styles.goalHeader}>
+            <View style={styles.goalIcon}>
+              <Ionicons name="rocket" size={20} color={palette.primary} />
+            </View>
+            <Text style={styles.eyebrow}>Career Track</Text>
           </View>
-          <Text style={styles.eyebrow}>Career Track</Text>
-        </View>
-        <Text style={styles.goalTitle}>{user.goal || "Set your goal in Profile"}</Text>
-      </AppCard>
+          <Text style={styles.goalTitle}>{user.goal || "Set your goal in Profile"}</Text>
+          {user.recommendation?.trim() ? (
+            <Text style={styles.goalHint} numberOfLines={2}>
+              {user.recommendation}
+            </Text>
+          ) : (
+            <Text style={styles.goalHint}>Tap to view your roadmap and career recommendations</Text>
+          )}
+        </AppCard>
+      </Pressable>
 
       <AppCard style={styles.coachCard}>
         <View style={styles.coachHeader}>
@@ -226,7 +238,7 @@ export function DashboardScreen({
         </View>
         <View style={commonStyles.stackSm}>
           {todayPlan.length === 0 ? (
-            <Text style={styles.emptyMuted}>Nothing scheduled today yet. Add tasks from the Tasks tab.</Text>
+            <Text style={styles.emptyMuted}>No tasks yet. Ask AI Coach to assign one, or add your own from Tasks.</Text>
           ) : null}
           {todayPlan.map((item) => (
             <View key={`${item.id}-${item.task}`} style={styles.timelineRow}>
@@ -283,7 +295,7 @@ export function DashboardScreen({
             <Ionicons name="calendar-outline" size={12} color={palette.muted} />
             <Text style={styles.taskDate}>
               {safeDate(task.start_date_time).slice(0, 10)}
-              {safeDate(task.end_date_time) ? ` → ${safeDate(task.end_date_time).slice(0, 10)}` : ""}
+              {safeDate(task.end_date_time) ? ` - ${safeDate(task.end_date_time).slice(0, 10)}` : ""}
             </Text>
           </View>
         </AppCard>
@@ -295,6 +307,14 @@ export function DashboardScreen({
 const styles = StyleSheet.create({
   screenRoot: {
     paddingBottom: 8,
+  },
+  appTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: palette.primary,
+    letterSpacing: 0.3,
+    marginBottom: 4,
+    textTransform: "uppercase",
   },
   headerActions: {
     flexDirection: "row",
@@ -393,6 +413,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "800",
     color: palette.text,
+  },
+  goalHint: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 19,
+    color: palette.muted,
+    fontWeight: "600",
   },
   coachCard: {
     backgroundColor: palette.primaryDark,

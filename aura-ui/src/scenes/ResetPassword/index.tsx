@@ -1,14 +1,31 @@
 import React, { useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { palette } from "../../theme";
 import { AppCard } from "../../components/AppCard";
 import { InputField } from "../../components/InputField";
 import { PrimaryButton } from "../../components/PrimaryButton";
 
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export function ResetPasswordScreen({ onBack }: { onBack: () => void }) {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = () => {
+    const normalized = email.trim().toLowerCase();
+    if (!normalized || !emailPattern.test(normalized)) {
+      setError("Enter a valid email address.");
+      return;
+    }
+    setError("");
+    setSent(true);
+    Alert.alert(
+      "Reset not configured",
+      "Password reset by email is not enabled in this build. Contact your administrator or sign in with your existing password.",
+    );
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.authScroll}>
@@ -18,7 +35,7 @@ export function ResetPasswordScreen({ onBack }: { onBack: () => void }) {
         </View>
         <Text style={styles.authTitle}>Reset Password</Text>
         <Text style={styles.authSubtitle}>
-          {sent ? "Check your inbox for reset instructions." : "Enter your email to receive a reset link."}
+          {sent ? "If an account exists, you will receive reset instructions." : "Enter your email to request a reset link."}
         </Text>
       </View>
 
@@ -29,19 +46,26 @@ export function ResetPasswordScreen({ onBack }: { onBack: () => void }) {
               label="Email"
               placeholder="you@university.edu"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(v) => {
+                setEmail(v);
+                if (error) setError("");
+              }}
               keyboardType="email-address"
               icon={<Feather name="mail" size={18} color={palette.muted} />}
             />
-            <PrimaryButton label="Send Reset Link" onPress={() => setSent(true)} />
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            <PrimaryButton label="Send Reset Link" onPress={submit} disabled={!email.trim()} />
+            <PrimaryButton label="Back to Sign In" onPress={onBack} secondary />
           </>
         ) : (
           <View style={styles.centeredBlock}>
             <View style={styles.successIcon}>
               <Feather name="check" size={24} color={palette.success} />
             </View>
-            <Text style={styles.confirmTitle}>Email sent</Text>
-            <Text style={styles.confirmText}>We sent reset instructions to {email || "your email address"}.</Text>
+            <Text style={styles.confirmTitle}>Request received</Text>
+            <Text style={styles.confirmText}>
+              If {email.trim()} is registered, reset instructions will be sent when email delivery is enabled.
+            </Text>
             <PrimaryButton label="Back to Sign In" onPress={onBack} secondary />
           </View>
         )}
@@ -106,5 +130,9 @@ const styles = StyleSheet.create({
     color: palette.muted,
     textAlign: "center",
     lineHeight: 22,
+  },
+  errorText: {
+    color: palette.danger,
+    fontWeight: "600",
   },
 });

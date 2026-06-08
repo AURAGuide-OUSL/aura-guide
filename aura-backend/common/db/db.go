@@ -29,8 +29,9 @@ func InitDB() error {
 		return fmt.Errorf("unable to ping database: %v", err)
 	}
 
-	if err := ensureUserCVAnalysisTable(context.Background()); err != nil {
-		log.Printf("user_cv_analysis migration skipped: %v", err)
+	// Best-effort schema fixes + reference data cleanup.
+	if err := runMigrations(context.Background()); err != nil {
+		log.Printf("migrations skipped/failed: %v", err)
 	}
 
 	// Best-effort seed data. We keep the backend running even if seeding fails,
@@ -46,19 +47,6 @@ func CloseDB() {
 	if Pool != nil {
 		Pool.Close()
 	}
-}
-
-func ensureUserCVAnalysisTable(ctx context.Context) error {
-	_, err := Pool.Exec(ctx, `
-CREATE TABLE IF NOT EXISTS user_cv_analysis (
-   user_id INT PRIMARY KEY REFERENCES user_student(id),
-   file_name VARCHAR(512),
-   uploaded_at TIMESTAMP WITH TIME ZONE,
-   strengths JSONB DEFAULT '[]'::jsonb,
-   weaknesses JSONB DEFAULT '[]'::jsonb,
-   improvements JSONB DEFAULT '[]'::jsonb
-)`)
-	return err
 }
 
 func runSeeds(ctx context.Context) error {
@@ -141,21 +129,9 @@ func runSeeds(ctx context.Context) error {
 		return err
 	}
 
-	// Goal-skill mapping: map all goal tracks to all skills with score_id=1
-	var gsmCount int
-	if err := Pool.QueryRow(ctx, "SELECT COUNT(*) FROM goal_skill_matrix").Scan(&gsmCount); err != nil {
+	// Goal-skill mapping with role-specific required scores (see migrations.go).
+	if err := seedGoalSkillMatrix(ctx); err != nil {
 		return err
-	}
-	if gsmCount == 0 {
-		if _, err := Pool.Exec(ctx, `INSERT INTO goal_skill_matrix (goal_id, skill_id, score_id)
-			SELECT g.id, s.id, 1
-			FROM goals g
-			JOIN skills s ON TRUE
-			WHERE NOT EXISTS (
-				SELECT 1 FROM goal_skill_matrix gsm WHERE gsm.goal_id=g.id AND gsm.skill_id=s.id
-			);`); err != nil {
-			return err
-		}
 	}
 
 	return nil

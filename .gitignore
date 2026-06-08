@@ -96,3 +96,7 @@ __pycache__/
 # Compiled Go binaries
 aura-backend/aura-backend
 **/bin/
+
+# Uploaded CV PDFs (local storage)
+data/cv/
+aura-backend/data/cv/

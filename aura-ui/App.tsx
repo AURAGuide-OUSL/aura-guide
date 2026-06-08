@@ -1,13 +1,14 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import "react-native-gesture-handler";
 import React, { useCallback, useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 
-import { palette } from "./src/theme";
+import { ThemeProvider } from "./src/theme/ThemeContext";
 import { Route, TabRoute, UserProfile } from "./src/types";
 import { initialProfile, tabRoutes } from "./src/constants";
-import { notificationSeed } from "./src-native/mockData";
+import { NotificationItem } from "./src/constants/appData";
 
 // Components
 import { BottomTabs } from "./src/components/BottomTabs";
@@ -43,7 +44,7 @@ export default function App() {
   const [tab, setTab] = useState<TabRoute>("dashboard");
   const [user, setUser] = useState<UserProfile>(initialProfile);
   const [tempPassword, setTempPassword] = useState("");
-  const [notifications, setNotifications] = useState(notificationSeed);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [settings, setSettings] = useState({
     notifications: true,
     darkMode: false,
@@ -51,10 +52,36 @@ export default function App() {
   });
   const [termsBackRoute, setTermsBackRoute] = useState<Route>("signup");
   const [pendingAgentTask, setPendingAgentTask] = useState<PendingTaskAnswerPayload | undefined>(undefined);
+  const [isReturningUser, setIsReturningUser] = useState(true);
 
   const clearPendingAgentTask = useCallback(() => {
     setPendingAgentTask(undefined);
   }, []);
+
+  useEffect(() => {
+    AsyncStorage.getItem("aura_dark_mode").then((v) => {
+      if (v === "1") {
+        setSettings((s) => ({ ...s, darkMode: true }));
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.setItem("aura_dark_mode", settings.darkMode ? "1" : "0");
+  }, [settings.darkMode]);
+
+  const loadNotifications = useCallback(async () => {
+    if (!settings.notifications) {
+      setNotifications([]);
+      return;
+    }
+    try {
+      const items = await api.listNotifications();
+      setNotifications(Array.isArray(items) ? items : []);
+    } catch {
+      setNotifications([]);
+    }
+  }, [settings.notifications]);
 
   const fetchProfile = async () => {
     try {
@@ -87,6 +114,7 @@ export default function App() {
         recommendation: profileData.recommendation ?? "",
         joinedDate: initialProfile.joinedDate,
       });
+      void loadNotifications();
       return true;
     } catch (err) {
       return false;
@@ -95,16 +123,23 @@ export default function App() {
 
   useEffect(() => {
     const checkAuth = async () => {
+      const returning = (await AsyncStorage.getItem("aura_returning_user")) === "1";
+      setIsReturningUser(returning);
       const ok = await fetchProfile();
       if (ok) {
+        await api.recordCheckIn().catch(() => {});
         setRoute("dashboard");
       } else {
         setRoute("signin");
       }
     };
 
-    const timer = setTimeout(checkAuth, 2000); // Keep splash for a bit
+    const timer = setTimeout(checkAuth, 2000);
     return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.getItem("aura_returning_user").then((v) => setIsReturningUser(v === "1"));
   }, []);
 
   const handleSignIn = async (email?: string, password?: string) => {
@@ -117,7 +152,12 @@ export default function App() {
     try {
       await api.login({ email: normalizedEmail, password: passwordValue });
       const ok = await fetchProfile();
-      if (ok) setRoute("dashboard");
+      if (ok) {
+        await api.recordCheckIn().catch(() => {});
+        await AsyncStorage.setItem("aura_returning_user", "1");
+        setIsReturningUser(true);
+        setRoute("dashboard");
+      }
     } catch (err) {
       alert("Login failed: " + (err as Error).message);
     }
@@ -135,6 +175,8 @@ export default function App() {
       await api.login({ email: profile.email, password: profile.password });
       const ok = await fetchProfile();
       if (ok) {
+        await api.recordCheckIn().catch(() => {});
+        setIsReturningUser(false);
         setRoute("dashboard");
       }
     } catch (err) {
@@ -144,14 +186,21 @@ export default function App() {
 
   const handleSignOut = async () => {
     await api.logout();
+    setUser(initialProfile);
+    setNotifications([]);
     setRoute("signin");
     setTab("dashboard");
   };
 
-  useEffect(() => {
-    const { setTheme } = require("./src/theme");
-    setTheme(settings.darkMode);
-  }, [settings.darkMode]);
+  const handleDeleteAccount = async () => {
+    await api.deleteAccount();
+    setUser(initialProfile);
+    setNotifications([]);
+    setPendingAgentTask(undefined);
+    setIsReturningUser(false);
+    setRoute("signin");
+    setTab("dashboard");
+  };
 
   const activeRoute = tabRoutes.includes(route as any) ? tab : route;
   const appBg = settings.darkMode ? "#0F172A" : "#F8FAFC";
@@ -194,6 +243,7 @@ export default function App() {
         return (
           <DashboardScreen
             user={user}
+            isReturningUser={isReturningUser}
             onNavigate={setRoute}
             onNavigateTab={setTab}
             onSignOut={handleSignOut}
@@ -221,6 +271,7 @@ export default function App() {
           <ProfileScreen
             user={user}
             onNavigateSettings={() => setRoute("settings")}
+            onSignOut={handleSignOut}
             onProfileUpdated={async () => {
               await fetchProfile();
             }}
@@ -237,6 +288,7 @@ export default function App() {
             }}
             onBack={() => setRoute("profile")}
             onSignOut={handleSignOut}
+            onDeleteAccount={handleDeleteAccount}
           />
         );
       case "notifications":
@@ -244,13 +296,17 @@ export default function App() {
           <NotificationsScreen
             notifications={notifications}
             onBack={() => setRoute("dashboard")}
-            onMarkAllRead={() => setNotifications((n) => n.map((item) => ({ ...item, read: true })))}
+            onRefresh={loadNotifications}
+            onMarkAllRead={async () => {
+              await api.markAllNotificationsRead().catch(() => {});
+              setNotifications((n) => n.map((item) => ({ ...item, read: true })));
+            }}
           />
         );
       case "calendar":
         return <CalendarScreen onBack={() => setRoute("dashboard")} />;
       case "careerTrack":
-        return <CareerTrackScreen onBack={() => setRoute("dashboard")} />;
+        return <CareerTrackScreen onBack={() => setRoute("dashboard")} user={user} />;
       case "terms":
         return <TermsScreen onBack={() => setRoute(termsBackRoute)} />;
       default:
@@ -262,13 +318,15 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <View style={styles.container}>
-        <StatusBar style={settings.darkMode ? "light" : "dark"} />
-        <SafeAreaView style={[styles.safeArea, { backgroundColor: appBg }]} edges={["top", "left", "right"]}>
-          {renderContent()}
-        </SafeAreaView>
-        {showTabs && <BottomTabs current={tab} onNavigate={(route: TabRoute) => setTab(route)} />}
-      </View>
+      <ThemeProvider isDark={settings.darkMode}>
+        <View style={styles.container}>
+          <StatusBar style={settings.darkMode ? "light" : "dark"} />
+          <SafeAreaView style={[styles.safeArea, { backgroundColor: appBg }]} edges={["top", "left", "right"]}>
+            {renderContent()}
+          </SafeAreaView>
+          {showTabs && <BottomTabs current={tab} onNavigate={(route: TabRoute) => setTab(route)} />}
+        </View>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

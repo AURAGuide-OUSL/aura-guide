@@ -144,6 +144,21 @@ func UploadCVPDFHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(res)
 }
 
+func DownloadCVHandler(w http.ResponseWriter, r *http.Request) {
+	email, ok := r.Context().Value(middleware.UserEmailKey).(string)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if err := service.ServeCVPDF(r.Context(), email, w, r); err != nil {
+		code := http.StatusNotFound
+		if strings.Contains(strings.ToLower(err.Error()), "unauthorized") {
+			code = http.StatusUnauthorized
+		}
+		http.Error(w, err.Error(), code)
+	}
+}
+
 func writeQuestions(w http.ResponseWriter, r *http.Request, topic string) {
 	questions := service.GetQuestions(topic)
 	w.Header().Set("Content-Type", "application/json")

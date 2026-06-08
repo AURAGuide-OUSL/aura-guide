@@ -20,19 +20,22 @@ func ForUser(ctx context.Context, userID int) (AuraMetrics, error) {
 	var avg *float64
 	var cnt int
 	err := db.Pool.QueryRow(ctx, `
-SELECT AVG(us.score_id::double precision)::float8,
-       COUNT(us.score_id)::int
-FROM user_skills us
-WHERE us.user_id = $1
-  AND us.skill_id IN (SELECT id FROM skills WHERE name IN (
-    'Professional Communication',
-    'Behavioral Interview Skills',
-    'Reflection and Self Assessment',
-    'Code Understanding',
-    'Debugging Reasoning',
-    'Algorithmic Thinking',
-    'Git Concept Knowledge'
-  ))`,
+SELECT AVG(sub.skill_avg)::float8, COUNT(*)::int
+FROM (
+  SELECT AVG(us.score_id::double precision) AS skill_avg
+  FROM user_skills us
+  WHERE us.user_id = $1
+    AND us.skill_id IN (SELECT id FROM skills WHERE name IN (
+      'Professional Communication',
+      'Behavioral Interview Skills',
+      'Reflection and Self Assessment',
+      'Code Understanding',
+      'Debugging Reasoning',
+      'Algorithmic Thinking',
+      'Git Concept Knowledge'
+    ))
+  GROUP BY us.skill_id
+) sub`,
 		userID,
 	).Scan(&avg, &cnt)
 	if err != nil {
