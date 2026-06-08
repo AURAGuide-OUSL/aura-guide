@@ -181,3 +181,18 @@ INSERT INTO status (name) VALUES ('pending'), ('in_progress'), ('completed'), ('
 INSERT INTO category (name) VALUES ('Technical'), ('Soft Skills'), ('Academic');
 
 INSERT INTO goals (name) VALUES ('Software Engineer'), ('Backend Developer'), ('QA Engineer');
+
+INSERT INTO skills (name, category_id) VALUES
+('Python', 1),
+('JavaScript', 1),
+('SQL', 1),
+('Code Understanding', 1),
+('Problem Solving', 1),
+('Data Structures', 1),
+('Algorithms', 1),
+('Communication', 2),
+('Teamwork', 2),
+('Time Management', 2),
+('Critical Thinking', 2),
+('Research', 3),
+('Academic Writing', 3);
