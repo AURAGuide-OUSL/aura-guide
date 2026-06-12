@@ -20,7 +20,7 @@ import { Message } from "../../types";
 import { api } from "../../api/api";
 import { screenPadding } from "../../styles/screenStyles";
 import { prettifyCvLine } from "../../utils/cvFeedback";
-import { formatCoachQuestion } from "../../utils/coachText";
+import { formatCoachFeedback, formatCoachQuestion } from "../../utils/coachText";
 
 const PROMPTS = [
   {
@@ -82,10 +82,11 @@ export function AICoachScreen({
   /** Input bar hidden until user picks a path or opens task answer from Tasks. */
   const [showComposer, setShowComposer] = useState(false);
   const [reflectionShowNext, setReflectionShowNext] = useState(false);
+  const [interviewShowNext, setInterviewShowNext] = useState(false);
   const [cvLocalSummary, setCvLocalSummary] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [fileName, setFileName] = useState("");
-  const [interviewShowNext, setInterviewShowNext] = useState(false);
+  const [inputHeight, setInputHeight] = useState(44);
   const scrollRef = useRef<ScrollView>(null);
 
   const activeTaskAnswer = useMemo((): PendingTaskAnswerPayload | null => {
@@ -293,7 +294,7 @@ export function AICoachScreen({
       setChatSessionId(res.session_id);
       pushAura(res.reply, "Communication");
       if (res.follow_up?.trim()) {
-        pushAura(res.follow_up.trim(), "Review");
+        pushAura(formatCoachFeedback(res.follow_up.trim()), "Review");
       }
     } catch (e) {
       pushAura(`Something went wrong: ${(e as Error).message}`, "Error");
@@ -365,22 +366,7 @@ export function AICoachScreen({
     const content = input.trim();
     if (!content) return;
 
-    const ethicsOk = async () => {
-      try {
-        const ethics = await api.validateEthicalAnswer(content);
-        if (ethics.status === "unethical") {
-          pushAura(ethics.message, "Review");
-          return false;
-        }
-      } catch (e) {
-        pushAura(`Ethical check failed: ${(e as Error).message}`, "Error");
-        return false;
-      }
-      return true;
-    };
-
     if (phase.kind === "task_answer") {
-      if (!(await ethicsOk())) return;
       pushUser(content);
       setInput("");
       setIsTyping(true);
@@ -394,7 +380,7 @@ export function AICoachScreen({
           session_id: chatSessionId ?? undefined,
         });
         setChatSessionId(res.session_id);
-        pushAura(res.feedback_message || "Thanks - review your skill matrix on Goals.", "Feedback");
+        pushAura(formatCoachFeedback(res.feedback_message || "Thanks - review your skill matrix on Goals."), "Feedback");
         setPhase({ kind: "home" });
         setShowComposer(false);
       } catch (e) {
@@ -406,7 +392,6 @@ export function AICoachScreen({
     }
 
     if (phase.kind === "interview" && phase.awaitingFeedback) {
-      if (!(await ethicsOk())) return;
       pushUser(content);
       setInput("");
       setIsTyping(true);
@@ -418,7 +403,7 @@ export function AICoachScreen({
           chatSessionId,
         );
         setChatSessionId(ev.session_id);
-        pushAura(ev.feedback, "Feedback");
+        pushAura(formatCoachFeedback(ev.feedback), "Feedback");
         setInterviewShowNext(true);
         setShowComposer(false);
         setPhase({
@@ -436,7 +421,6 @@ export function AICoachScreen({
     }
 
     if (phase.kind === "reflection" && phase.awaitingFeedback) {
-      if (!(await ethicsOk())) return;
       pushUser(content);
       setInput("");
       setIsTyping(true);
@@ -448,7 +432,7 @@ export function AICoachScreen({
           chatSessionId,
         );
         setChatSessionId(ev.session_id);
-        pushAura(ev.feedback, "Feedback");
+        pushAura(formatCoachFeedback(ev.feedback), "Feedback");
         setReflectionShowNext(true);
         setShowComposer(false);
         setPhase({
@@ -466,7 +450,6 @@ export function AICoachScreen({
     }
 
     if (phase.kind === "communication") {
-      if (!(await ethicsOk())) return;
       pushUser(content);
       setInput("");
       setIsTyping(true);
@@ -475,7 +458,7 @@ export function AICoachScreen({
         setChatSessionId(res.session_id);
         pushAura(res.reply, "Communication");
         if (res.follow_up?.trim()) {
-          pushAura(res.follow_up.trim(), "Review");
+          pushAura(formatCoachFeedback(res.follow_up.trim()), "Review");
         }
         const ended =
           res.reply.trim() === "Session ended. Good job today!" ||
@@ -527,7 +510,18 @@ export function AICoachScreen({
       const lower = name.toLowerCase();
       const mime = (asset.mimeType || "").toLowerCase();
       const pdfMsg =
-        "Only .pdf files can be uploaded as your CV. Other formats are not accepted - export your document as PDF and try again.";
+        "Only PDF files can be uploaded as your CV. Word, text, and other document types are not accepted — export your CV as PDF and try again.";
+      const blockedMime =
+        mime.startsWith("text/") ||
+        mime.includes("msword") ||
+        mime.includes("wordprocessingml") ||
+        mime.includes("opendocument") ||
+        mime === "application/rtf" ||
+        mime === "application/json";
+      if (blockedMime) {
+        Alert.alert("PDF only", pdfMsg);
+        return;
+      }
       if (!lower.endsWith(".pdf")) {
         Alert.alert("PDF only", pdfMsg);
         return;
@@ -767,8 +761,13 @@ export function AICoachScreen({
               onChangeText={setInput}
               placeholder="Type your message…"
               placeholderTextColor={palette.muted}
-              style={styles.footerInput}
+              style={[styles.footerInput, { height: Math.min(160, Math.max(44, inputHeight)) }]}
               multiline
+              textAlignVertical="top"
+              onContentSizeChange={(e) => {
+                const h = e.nativeEvent.contentSize.height;
+                setInputHeight(Math.min(160, Math.max(44, h + 12)));
+              }}
             />
             <Pressable accessibilityLabel="Send" onPress={sendComposer} style={styles.sendFab}>
               <Ionicons name="send" size={20} color="#FFFFFF" />

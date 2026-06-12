@@ -6,17 +6,20 @@ import { AppCard } from "../../components/AppCard";
 import { ProgressBar } from "../../components/ProgressBar";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { api } from "../../api/api";
-import { screenStyles } from "../../styles/screenStyles";
+import { useScreenScrollStyle } from "../../styles/screenStyles";
+import { useTextColors } from "../../theme/themedHelpers";
+import { useTheme } from "../../theme/ThemeContext";
 
 export function GoalsScreen() {
   const { width } = useWindowDimensions();
+  const tc = useTextColors();
+  const scrollStyle = useScreenScrollStyle();
   const [summary, setSummary] = useState<any>({
     completed_tasks: 0,
     skills: [],
     career_title: "",
     aura_score_percent: 0,
     skill_readiness_label: "",
-    recommendation: "",
   });
 
   useEffect(() => {
@@ -30,7 +33,6 @@ export function GoalsScreen() {
             career_title: "",
             aura_score_percent: 0,
             skill_readiness_label: "",
-            recommendation: "",
           },
         ),
       )
@@ -41,12 +43,9 @@ export function GoalsScreen() {
           career_title: "",
           aura_score_percent: 0,
           skill_readiness_label: "",
-          recommendation: "",
         }),
       );
   }, []);
-
-  const industryReady = (summary.skill_readiness_label || "").toLowerCase().includes("industry");
 
   const technicalSkills = useMemo(
     () => (summary.skills || []).filter((skill: any) => (skill.category_name || "").toLowerCase() === "technical"),
@@ -61,7 +60,7 @@ export function GoalsScreen() {
   const softAvg = useMemo(() => avgPct(softSkills), [softSkills]);
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[screenStyles.scrollContent, { backgroundColor: palette.background }]}>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={scrollStyle}>
       <ScreenHeader title="Goals & Skills" subtitle="Your professional roadmap" />
 
       <AppCard style={styles.hero}>
@@ -102,13 +101,6 @@ export function GoalsScreen() {
         </Text>
       </AppCard>
 
-      {industryReady && summary.recommendation ? (
-        <AppCard style={styles.recCard}>
-          <Text style={styles.recEyebrow}>Career path recommendation</Text>
-          <Text style={styles.recText}>{summary.recommendation}</Text>
-        </AppCard>
-      ) : null}
-
       <SkillSection title="Technical Skills" subtitle="Core competencies for your role" tone="tech" skills={technicalSkills} empty="No technical skills found for this goal." />
 
       <SkillSection title="Soft Skills" subtitle="Essential interpersonal abilities" tone="soft" skills={softSkills} empty="No soft skills found for this goal." />
@@ -135,7 +127,9 @@ function SkillSection({
   skills: any[];
   empty: string;
 }) {
-  const barColor = tone === "tech" ? palette.primary : palette.secondary;
+  const { colors } = useTheme();
+  const tc = useTextColors();
+  const barColor = tone === "tech" ? colors.primary : colors.secondary;
 
   return (
     <View style={styles.sectionContainer}>
@@ -144,8 +138,8 @@ function SkillSection({
           <Ionicons name={tone === "tech" ? "code-slash" : "chatbubbles"} size={18} color={barColor} />
         </View>
         <View>
-          <Text style={styles.sectionTitle}>{title}</Text>
-          <Text style={styles.sectionSub}>{subtitle}</Text>
+          <Text style={[styles.sectionTitle, tc.text]}>{title}</Text>
+          <Text style={[styles.sectionSub, tc.muted]}>{subtitle}</Text>
         </View>
       </View>
 
@@ -158,7 +152,7 @@ function SkillSection({
           {skills.map((skill: any) => (
             <AppCard key={String(skill.skill_id)} style={styles.skillBlock}>
               <View style={commonStyles.progressSummaryRow}>
-                <Text style={styles.skillName} numberOfLines={2}>{skill.skill_name}</Text>
+                <Text style={[styles.skillName, tc.text]} numberOfLines={2}>{skill.skill_name}</Text>
                 <View style={styles.pctBadge}>
                   <Text style={[styles.skillPct, { color: barColor }]}>
                     {skill.current_pct}%
@@ -166,10 +160,10 @@ function SkillSection({
                 </View>
               </View>
               <View style={styles.levelRow}>
-                <Text style={styles.levelHint}>
+                <Text style={[styles.levelHint, tc.muted]}>
                   Level: <Text style={styles.levelValue}>{skill.current_level || "Not assessed"}</Text>
                 </Text>
-                <Text style={styles.levelHint}>
+                <Text style={[styles.levelHint, tc.muted]}>
                   Target: <Text style={styles.levelValue}>{skill.required_level || "—"}</Text>
                 </Text>
               </View>
@@ -254,23 +248,6 @@ const styles = StyleSheet.create({
   heroAuraEm: {
     fontWeight: "800",
     color: "#FFFFFF",
-  },
-  recCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: palette.success,
-  },
-  recEyebrow: {
-    fontSize: 12,
-    fontWeight: "900",
-    color: palette.muted,
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-    marginBottom: 8,
-  },
-  recText: {
-    color: palette.text,
-    lineHeight: 22,
-    fontWeight: "600",
   },
   heroDivider: {
     width: 1,

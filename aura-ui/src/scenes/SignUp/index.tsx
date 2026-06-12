@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
-import { palette } from "../../theme";
 import { AppCard } from "../../components/AppCard";
 import { InputField } from "../../components/InputField";
 import { PrimaryButton } from "../../components/PrimaryButton";
 import { TextLink } from "../../components/TextLink";
+import { useTheme } from "../../theme/ThemeContext";
 import { api } from "../../api/api";
 
 export function SignUpScreen({
@@ -17,6 +17,7 @@ export function SignUpScreen({
   onOpenSignIn: () => void;
   onContinue: (email: string, password: string) => void;
 }) {
+  const { colors } = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -26,6 +27,53 @@ export function SignUpScreen({
   const [emailChecked, setEmailChecked] = useState(false);
   const [checkingEmail, setCheckingEmail] = useState(false);
   const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        authScroll: {
+          paddingHorizontal: 20,
+          paddingVertical: 28,
+          justifyContent: "center",
+          minHeight: "100%",
+          gap: 18,
+          backgroundColor: colors.background,
+        },
+        authHero: { alignItems: "center", gap: 10 },
+        logoBubble: {
+          width: 74,
+          height: 74,
+          borderRadius: 24,
+          backgroundColor: colors.surface,
+          alignItems: "center",
+          justifyContent: "center",
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        authTitle: { fontSize: 30, fontWeight: "800", color: colors.text, textAlign: "center" },
+        authSubtitle: { maxWidth: 300, textAlign: "center", color: colors.muted, lineHeight: 22 },
+        authCard: { gap: 14 },
+        authFooter: { flexDirection: "row", justifyContent: "center", gap: 6, alignItems: "center" },
+        authFooterText: { color: colors.muted },
+        inlineRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
+        checkboxRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+        checkbox: {
+          width: 20,
+          height: 20,
+          borderRadius: 6,
+          borderWidth: 1,
+          borderColor: colors.border,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: colors.surface,
+        },
+        checkboxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
+        checkboxText: { flex: 1, color: colors.muted, lineHeight: 20 },
+        errorText: { color: colors.danger, fontWeight: "600" },
+        actionsRow: { flexDirection: "row", gap: 12 },
+      }),
+    [colors],
+  );
 
   const validateEmail = async () => {
     const normalizedEmail = email.trim().toLowerCase();
@@ -78,7 +126,7 @@ export function SignUpScreen({
     <ScrollView contentContainerStyle={styles.authScroll}>
       <View style={styles.authHero}>
         <View style={styles.logoBubble}>
-          <Ionicons name="sparkles" size={34} color={palette.primary} />
+          <Ionicons name="sparkles" size={34} color={colors.primary} />
         </View>
         <Text style={styles.authTitle}>Join AURA Guide</Text>
         <Text style={styles.authSubtitle}>Create your account and set up your growth plan.</Text>
@@ -95,7 +143,7 @@ export function SignUpScreen({
             if (error) setError("");
           }}
           keyboardType="email-address"
-          icon={<Feather name="mail" size={18} color={palette.muted} />}
+          icon={<Feather name="mail" size={18} color={colors.muted} />}
         />
 
         <InputField
@@ -109,7 +157,7 @@ export function SignUpScreen({
             setPassword(value);
           }}
           secureTextEntry={!showPassword}
-          icon={<Feather name="lock" size={18} color={palette.muted} />}
+          icon={<Feather name="lock" size={18} color={colors.muted} />}
         />
 
         <InputField
@@ -118,17 +166,17 @@ export function SignUpScreen({
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           secureTextEntry={!showPassword}
-          icon={<Feather name="lock" size={18} color={palette.muted} />}
+          icon={<Feather name="lock" size={18} color={colors.muted} />}
         />
 
         <View style={styles.inlineRow}>
-          <TextLink label={showPassword ? "Hide passwords" : "Show passwords"} onPress={() => setShowPassword((value) => !value)} />
+          <TextLink label={showPassword ? "Hide passwords" : "Show passwords"} onPress={() => setShowPassword((v) => !v)} />
           <TextLink label="View terms" onPress={onOpenTerms} />
         </View>
 
-        <Pressable onPress={() => setAcceptTerms((value) => !value)} style={styles.checkboxRow}>
+        <Pressable onPress={() => setAcceptTerms((v) => !v)} style={styles.checkboxRow}>
           <View style={[styles.checkbox, acceptTerms ? styles.checkboxChecked : undefined]}>
-            {acceptTerms ? <Ionicons name="checkmark" size={14} color={palette.surface} /> : null}
+            {acceptTerms ? <Ionicons name="checkmark" size={14} color="#FFFFFF" /> : null}
           </View>
           <Text style={styles.checkboxText}>
             I accept the Terms and Conditions (Last updated: May 2026) and Privacy Policy
@@ -150,87 +198,3 @@ export function SignUpScreen({
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  authScroll: {
-    paddingHorizontal: 20,
-    paddingVertical: 28,
-    justifyContent: "center",
-    minHeight: "100%",
-    gap: 18,
-  },
-  authHero: {
-    alignItems: "center",
-    gap: 10,
-  },
-  logoBubble: {
-    width: 74,
-    height: 74,
-    borderRadius: 24,
-    backgroundColor: "rgba(255,255,255,0.8)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  authTitle: {
-    fontSize: 30,
-    fontWeight: "800",
-    color: palette.text,
-    textAlign: "center",
-  },
-  authSubtitle: {
-    maxWidth: 300,
-    textAlign: "center",
-    color: palette.muted,
-    lineHeight: 22,
-  },
-  authCard: {
-    gap: 14,
-  },
-  authFooter: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 6,
-    alignItems: "center",
-  },
-  authFooterText: {
-    color: palette.muted,
-  },
-  inlineRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-  },
-  checkboxRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: palette.border,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: palette.surface,
-  },
-  checkboxChecked: {
-    backgroundColor: palette.primary,
-    borderColor: palette.primary,
-  },
-  checkboxText: {
-    flex: 1,
-    color: palette.muted,
-    lineHeight: 20,
-  },
-  errorText: {
-    color: palette.danger,
-    fontWeight: "600",
-  },
-  actionsRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-});

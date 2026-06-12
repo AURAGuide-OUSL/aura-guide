@@ -10,7 +10,8 @@ import { SegmentedControl } from "../../components/SegmentedControl";
 import { PrimaryButton } from "../../components/PrimaryButton";
 import { InputField } from "../../components/InputField";
 import { api } from "../../api/api";
-import { screenStyles } from "../../styles/screenStyles";
+import { screenStyles, useScreenScrollStyle } from "../../styles/screenStyles";
+import { useTextColors } from "../../theme/themedHelpers";
 import { PendingTaskAnswerPayload } from "../AICoach";
 
 function statusLabel(status: string | undefined) {
@@ -91,6 +92,8 @@ export function TasksScreen({
   onNavigateCalendar: () => void;
   onRequestAgentTaskAnswer?: (payload: PendingTaskAnswerPayload) => void;
 }) {
+  const tc = useTextColors();
+  const scrollStyle = useScreenScrollStyle();
   const [listTab, setListTab] = useState("Today");
   const [tasks, setTasks] = useState<any[]>([]);
   const [showAddTaskCard, setShowAddTaskCard] = useState(false);
@@ -218,7 +221,7 @@ export function TasksScreen({
   };
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[screenStyles.scrollContent, { backgroundColor: palette.background }]}>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={scrollStyle}>
       <ScreenHeader
         title="Tasks"
         subtitle="Stay on top of your plan"
@@ -245,7 +248,7 @@ export function TasksScreen({
       {showAddTaskCard ? (
         <View style={styles.addTaskSheet}>
           <View style={styles.addTaskToolbar}>
-            <Text style={styles.addTaskToolbarTitle}>Create Task</Text>
+            <Text style={[styles.addTaskToolbarTitle, tc.text]}>Create Task</Text>
             <Pressable
               onPress={() => setShowAddTaskCard(false)}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -260,8 +263,8 @@ export function TasksScreen({
                 <Ionicons name="add" size={24} color={palette.primary} />
               </View>
               <View>
-                <Text style={styles.addTitle}>Create Task</Text>
-                <Text style={styles.addHint}>Add a custom goal to your track</Text>
+                <Text style={[styles.addTitle, tc.text]}>Create Task</Text>
+                <Text style={[styles.addHint, tc.muted]}>Add a custom goal to your track</Text>
               </View>
             </View>
             <View style={commonStyles.stackSm}>
@@ -293,7 +296,7 @@ export function TasksScreen({
       {editingTask ? (
         <View style={styles.addTaskSheet}>
           <View style={styles.addTaskToolbar}>
-            <Text style={styles.addTaskToolbarTitle}>Edit Task</Text>
+            <Text style={[styles.addTaskToolbarTitle, tc.text]}>Edit Task</Text>
             <Pressable onPress={() => setEditingTask(null)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
               <Text style={styles.cancelLink}>Cancel</Text>
             </Pressable>
@@ -320,8 +323,8 @@ export function TasksScreen({
           <View style={styles.emptyIcon}>
             <Ionicons name="clipboard-outline" size={48} color={palette.muted} />
           </View>
-          <Text style={styles.emptyTitle}>No tasks here</Text>
-          <Text style={styles.emptyBody}>
+            <Text style={[styles.emptyTitle, tc.text]}>No tasks here</Text>
+            <Text style={[styles.emptyBody, tc.muted]}>
             {listTab === "Today" && "You're all caught up for today! Add a personal task below."}
             {listTab === "Upcoming" && "No future tasks scheduled. Plan your next moves!"}
             {listTab === "Completed" && "Finish tasks to see them in your archives."}
@@ -334,7 +337,7 @@ export function TasksScreen({
           <AppCard key={`${task.task_origin ?? "custom"}-${task.id}`} style={styles.taskCard}>
             <View style={styles.cardTop}>
               <View style={commonStyles.flexOne}>
-                <Text selectable style={styles.taskDescription}>
+                <Text selectable style={[styles.taskDescription, tc.text]}>
                   {task.task}
                 </Text>
                 <View style={[commonStyles.badgeRow, styles.badges]}>
@@ -379,7 +382,7 @@ export function TasksScreen({
             <View style={styles.dateFooter}>
               <View style={styles.dateInfo}>
                 <Ionicons name="calendar-outline" size={14} color={palette.muted} />
-                <Text style={styles.dateText}>
+                <Text style={[styles.dateText, tc.muted]}>
                   {safeDate(task.start_date_time).slice(0, 10)} - {safeDate(task.end_date_time).slice(0, 10) || "-"}
                 </Text>
               </View>

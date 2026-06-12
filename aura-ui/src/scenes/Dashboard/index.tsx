@@ -9,7 +9,8 @@ import { ScreenHeader } from "../../components/ScreenHeader";
 import { TextLink } from "../../components/TextLink";
 import { UserProfile, Route, TabRoute } from "../../types";
 import { api } from "../../api/api";
-import { screenStyles } from "../../styles/screenStyles";
+import { screenStyles, useScreenScrollStyle } from "../../styles/screenStyles";
+import { useTextColors } from "../../theme/themedHelpers";
 
 function formatToday() {
   return new Date().toLocaleDateString("en-US", {
@@ -63,6 +64,8 @@ export function DashboardScreen({
   onSignOut: () => void;
 }) {
   const { width } = useWindowDimensions();
+  const tc = useTextColors();
+  const scrollStyle = useScreenScrollStyle(styles.screenRoot);
   const [tasks, setTasks] = useState<any[]>([]);
   const [todayPlan, setTodayPlan] = useState<any[]>([]);
   const [dayStreak, setDayStreak] = useState(1);
@@ -113,7 +116,7 @@ export function DashboardScreen({
   const goTab = onNavigateTab ?? ((_t: TabRoute) => {});
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[screenStyles.scrollContent, styles.screenRoot]}>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={scrollStyle}>
       {/*<Text style={styles.appTitle}>AURA Guide – Your Personalized Career Coach</Text>*/}
       <ScreenHeader
         title={isReturningUser ? `Welcome back,\n${name}!` : `Welcome,\n${name}!`}
@@ -139,7 +142,7 @@ export function DashboardScreen({
         <AppCard style={[styles.metricCard, styles.metricCardElevated]}>
           <View style={styles.metricContent}>
             <View>
-              <Text style={styles.metricValue}>{score}</Text>
+              <Text style={[styles.metricValue, tc.text]}>{score}</Text>
               <Text style={styles.metricLabel}>Aura score (0–100)</Text>
               {readiness ? <Text style={styles.metricHint}>{readiness}</Text> : null}
             </View>
@@ -151,7 +154,7 @@ export function DashboardScreen({
         <AppCard style={[styles.metricCard, styles.metricCardElevated]}>
           <View style={styles.metricContent}>
             <View>
-              <Text style={styles.metricValue}>{dayStreak}</Text>
+              <Text style={[styles.metricValue, tc.text]}>{dayStreak}</Text>
               <Text style={styles.metricLabel}>Day Streak</Text>
             </View>
             <View style={[styles.metricIconWrap, { backgroundColor: palette.chipGreen }]}>
@@ -169,14 +172,7 @@ export function DashboardScreen({
             </View>
             <Text style={styles.eyebrow}>Career Track</Text>
           </View>
-          <Text style={styles.goalTitle}>{user.goal || "Set your goal in Profile"}</Text>
-          {user.recommendation?.trim() ? (
-            <Text style={styles.goalHint} numberOfLines={2}>
-              {user.recommendation}
-            </Text>
-          ) : (
-            <Text style={styles.goalHint}>Tap to view your roadmap and career recommendations</Text>
-          )}
+          <Text style={[styles.goalTitle, tc.text]}>{user.goal || "Set your goal in Profile"}</Text>
         </AppCard>
       </Pressable>
 
@@ -189,7 +185,7 @@ export function DashboardScreen({
         {coachSupporting ? <Text style={styles.coachSupport}>{coachSupporting}</Text> : null}
       </AppCard>
 
-      <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Quick Actions</Text>
+      <Text style={[styles.sectionTitle, styles.sectionTitleSpaced, tc.text]}>Quick Actions</Text>
       {/*<View style={styles.quickActionsRow}>*/}
       {/*  <Pressable*/}
       {/*    style={({ pressed }) => [styles.quickActionTile, pressed && styles.quickPressed]}*/}
@@ -226,25 +222,25 @@ export function DashboardScreen({
           <Ionicons name="calendar-outline" size={22} color={palette.primary} />
         </View>
         <View style={commonStyles.flexOne}>
-          <Text style={styles.calendarRowTitle}>Calendar</Text>
-          <Text style={styles.calendarRowSub}>Sessions & deadlines</Text>
+          <Text style={[styles.calendarRowTitle, tc.text]}>Calendar</Text>
+          <Text style={[styles.calendarRowSub, tc.muted]}>Sessions & deadlines</Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={palette.muted} />
       </Pressable>
 
       <AppCard style={commonStyles.stackMd}>
         <View style={styles.sectionHeadingRow}>
-          <Text style={styles.sectionTitle}>Today's Plan</Text>
+          <Text style={[styles.sectionTitle, tc.text]}>Today's Plan</Text>
         </View>
         <View style={commonStyles.stackSm}>
           {todayPlan.length === 0 ? (
-            <Text style={styles.emptyMuted}>No tasks yet. Ask AI Coach to assign one, or add your own from Tasks.</Text>
+            <Text style={[styles.emptyMuted, tc.muted]}>No tasks yet. Ask AI Coach to assign one, or add your own from Tasks.</Text>
           ) : null}
           {todayPlan.map((item) => (
             <View key={`${item.id}-${item.task}`} style={styles.timelineRow}>
               <View style={[styles.timelineLine, item.status === "completed" && styles.timelineLineDone]} />
               <View style={commonStyles.flexOne}>
-                <Text style={[styles.timelineTask, item.status === "completed" && styles.timelineTaskDone]}>{item.task}</Text>
+                <Text style={[styles.timelineTask, tc.text, item.status === "completed" && styles.timelineTaskDone]}>{item.task}</Text>
                 <View style={styles.timelineMetaRow}>
                   <Ionicons name="time-outline" size={12} color={palette.muted} />
                   <Text style={styles.timelineMeta}>
@@ -259,7 +255,7 @@ export function DashboardScreen({
       </AppCard>
 
       <View style={styles.sectionHeadingRow}>
-        <Text style={styles.sectionTitle}>Ongoing Tasks</Text>
+        <Text style={[styles.sectionTitle, tc.text]}>Ongoing Tasks</Text>
         <TextLink label="View all" onPress={() => onNavigate("tasks")} />
       </View>
 
@@ -413,13 +409,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "800",
     color: palette.text,
-  },
-  goalHint: {
-    marginTop: 8,
-    fontSize: 13,
-    lineHeight: 19,
-    color: palette.muted,
-    fontWeight: "600",
   },
   coachCard: {
     backgroundColor: palette.primaryDark,

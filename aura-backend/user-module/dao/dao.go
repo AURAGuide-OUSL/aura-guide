@@ -2,6 +2,7 @@ package dao
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	"aura-backend/common/cvstorage"
@@ -90,15 +91,15 @@ func DeleteUserByEmail(ctx context.Context, email string) error {
 		`DELETE FROM user_notification WHERE user_id = $1`,
 		`DELETE FROM user_badge WHERE user_id = $1`,
 		`DELETE FROM user_cv_analysis WHERE user_id = $1`,
+		`DELETE FROM user_cv WHERE user_id = $1`,
 		`DELETE FROM user_streak WHERE user_id = $1`,
 		`DELETE FROM user_student WHERE id = $1`,
 	}
 	for _, q := range stmts {
 		if _, err := db.Pool.Exec(ctx, q, uid); err != nil {
-			return err
+			return fmt.Errorf("delete %s: %w", q, err)
 		}
 	}
-	_, _ = db.Pool.Exec(ctx, `DELETE FROM user_cv WHERE user_id = $1`, uid)
 	if cvPath != nil && *cvPath != "" {
 		cvstorage.RemoveFile(*cvPath)
 	}

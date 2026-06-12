@@ -1,17 +1,64 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { palette } from "../../theme";
 import { AppCard } from "../../components/AppCard";
 import { InputField } from "../../components/InputField";
 import { PrimaryButton } from "../../components/PrimaryButton";
+import { useTheme } from "../../theme/ThemeContext";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function ResetPasswordScreen({ onBack }: { onBack: () => void }) {
+  const { colors } = useTheme();
   const [email, setEmail] = useState("");
-  const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        authScroll: {
+          paddingHorizontal: 20,
+          paddingVertical: 28,
+          justifyContent: "center",
+          minHeight: "100%",
+          gap: 18,
+          backgroundColor: colors.background,
+        },
+        authHero: { alignItems: "center", gap: 10 },
+        logoBubble: {
+          width: 74,
+          height: 74,
+          borderRadius: 24,
+          backgroundColor: colors.surface,
+          alignItems: "center",
+          justifyContent: "center",
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        authTitle: {
+          fontSize: 30,
+          fontWeight: "800",
+          color: colors.text,
+          textAlign: "center",
+        },
+        authSubtitle: {
+          maxWidth: 320,
+          textAlign: "center",
+          color: colors.muted,
+          lineHeight: 22,
+          fontWeight: "600",
+        },
+        authCard: { gap: 14 },
+        errorText: { color: colors.danger, fontWeight: "600" },
+        notice: {
+          color: colors.muted,
+          fontSize: 13,
+          lineHeight: 20,
+          fontWeight: "600",
+        },
+      }),
+    [colors],
+  );
 
   const submit = () => {
     const normalized = email.trim().toLowerCase();
@@ -20,10 +67,10 @@ export function ResetPasswordScreen({ onBack }: { onBack: () => void }) {
       return;
     }
     setError("");
-    setSent(true);
     Alert.alert(
-      "Reset not configured",
-      "Password reset by email is not enabled in this build. Contact your administrator or sign in with your existing password.",
+      "Email reset not available",
+      "Password reset by email is not enabled in this version. Please sign in with your existing password or contact your administrator.",
+      [{ text: "OK", onPress: onBack }],
     );
   };
 
@@ -31,108 +78,34 @@ export function ResetPasswordScreen({ onBack }: { onBack: () => void }) {
     <ScrollView contentContainerStyle={styles.authScroll}>
       <View style={styles.authHero}>
         <View style={styles.logoBubble}>
-          <Feather name="mail" size={34} color={palette.primary} />
+          <Feather name="mail" size={34} color={colors.primary} />
         </View>
         <Text style={styles.authTitle}>Reset Password</Text>
         <Text style={styles.authSubtitle}>
-          {sent ? "If an account exists, you will receive reset instructions." : "Enter your email to request a reset link."}
+          Email-based password reset is not configured for this app yet.
         </Text>
       </View>
 
       <AppCard style={styles.authCard}>
-        {!sent ? (
-          <>
-            <InputField
-              label="Email"
-              placeholder="you@university.edu"
-              value={email}
-              onChangeText={(v) => {
-                setEmail(v);
-                if (error) setError("");
-              }}
-              keyboardType="email-address"
-              icon={<Feather name="mail" size={18} color={palette.muted} />}
-            />
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-            <PrimaryButton label="Send Reset Link" onPress={submit} disabled={!email.trim()} />
-            <PrimaryButton label="Back to Sign In" onPress={onBack} secondary />
-          </>
-        ) : (
-          <View style={styles.centeredBlock}>
-            <View style={styles.successIcon}>
-              <Feather name="check" size={24} color={palette.success} />
-            </View>
-            <Text style={styles.confirmTitle}>Request received</Text>
-            <Text style={styles.confirmText}>
-              If {email.trim()} is registered, reset instructions will be sent when email delivery is enabled.
-            </Text>
-            <PrimaryButton label="Back to Sign In" onPress={onBack} secondary />
-          </View>
-        )}
+        <Text style={styles.notice}>
+          If you forgot your password, use an account you can still access or ask your course administrator to help.
+          We do not send reset links until an email service is connected on the server.
+        </Text>
+        <InputField
+          label="Email (for your records)"
+          placeholder="you@university.edu"
+          value={email}
+          onChangeText={(v) => {
+            setEmail(v);
+            if (error) setError("");
+          }}
+          keyboardType="email-address"
+          icon={<Feather name="mail" size={18} color={colors.muted} />}
+        />
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        <PrimaryButton label="Continue" onPress={submit} disabled={!email.trim()} />
+        <PrimaryButton label="Back to Sign In" onPress={onBack} secondary />
       </AppCard>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  authScroll: {
-    paddingHorizontal: 20,
-    paddingVertical: 28,
-    justifyContent: "center",
-    minHeight: "100%",
-    gap: 18,
-  },
-  authHero: {
-    alignItems: "center",
-    gap: 10,
-  },
-  logoBubble: {
-    width: 74,
-    height: 74,
-    borderRadius: 24,
-    backgroundColor: "rgba(255,255,255,0.8)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  authTitle: {
-    fontSize: 30,
-    fontWeight: "800",
-    color: palette.text,
-    textAlign: "center",
-  },
-  authSubtitle: {
-    maxWidth: 300,
-    textAlign: "center",
-    color: palette.muted,
-    lineHeight: 22,
-  },
-  authCard: {
-    gap: 14,
-  },
-  centeredBlock: {
-    alignItems: "center",
-    gap: 12,
-  },
-  successIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: palette.chipGreen,
-  },
-  confirmTitle: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: palette.text,
-  },
-  confirmText: {
-    color: palette.muted,
-    textAlign: "center",
-    lineHeight: 22,
-  },
-  errorText: {
-    color: palette.danger,
-    fontWeight: "600",
-  },
-});

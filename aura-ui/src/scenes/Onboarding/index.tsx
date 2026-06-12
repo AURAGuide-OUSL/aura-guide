@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { Picker } from "@react-native-picker/picker";
-import { palette, commonStyles } from "../../theme";
+import { commonStyles } from "../../theme";
+import { useTheme } from "../../theme/ThemeContext";
 import { AppCard } from "../../components/AppCard";
 import { InputField } from "../../components/InputField";
 import { PickerField } from "../../components/PickerField";
@@ -33,6 +34,27 @@ export function OnboardingScreen({
   const [softSkillLevel, setSoftSkillLevel] = useState(initialProfile.softSkillLevel);
   const [availabilityType, setAvailabilityType] = useState(initialProfile.availabilityType);
   const [availabilityHours, setAvailabilityHours] = useState(initialProfile.availabilityHours);
+  const { colors } = useTheme();
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        screenContent: {
+          paddingHorizontal: 20,
+          paddingTop: 18,
+          paddingBottom: 24,
+          gap: 16,
+          backgroundColor: colors.background,
+        },
+        kicker: { color: colors.primary, fontWeight: "700" },
+        onboardingTitle: { fontSize: 28, fontWeight: "800", color: colors.text },
+        onboardingSubtitle: { color: colors.muted, lineHeight: 22 },
+        sectionCard: { gap: 14 },
+        actionRow: { flexDirection: "row", gap: 12 },
+        unsureHint: { fontSize: 13, lineHeight: 20, color: colors.muted, fontWeight: "600" },
+      }),
+    [colors],
+  );
 
   const progress = step === 1 ? 50 : 100;
   const canContinue = step === 1
@@ -168,38 +190,3 @@ export function OnboardingScreen({
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  screenContent: {
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 24,
-    gap: 16,
-  },
-  kicker: {
-    color: palette.primary,
-    fontWeight: "700",
-  },
-  onboardingTitle: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: palette.text,
-  },
-  onboardingSubtitle: {
-    color: palette.muted,
-    lineHeight: 22,
-  },
-  sectionCard: {
-    gap: 14,
-  },
-  actionRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  unsureHint: {
-    fontSize: 13,
-    lineHeight: 20,
-    color: palette.muted,
-    fontWeight: "600",
-  },
-});

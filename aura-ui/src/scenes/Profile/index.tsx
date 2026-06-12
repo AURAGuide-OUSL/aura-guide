@@ -10,7 +10,8 @@ import { ScreenHeader } from "../../components/ScreenHeader";
 import { UserProfile } from "../../types";
 import { Picker } from "@react-native-picker/picker";
 import { api } from "../../api/api";
-import { screenStyles } from "../../styles/screenStyles";
+import { screenStyles, useScreenScrollStyle } from "../../styles/screenStyles";
+import { useTextColors } from "../../theme/themedHelpers";
 import { prettifyCvLine } from "../../utils/cvFeedback";
 
 function avgPct(skills: { current_pct?: number }[]) {
@@ -31,6 +32,8 @@ export function ProfileScreen({
   onProfileUpdated: () => Promise<void>;
 }) {
   const { width } = useWindowDimensions();
+  const tc = useTextColors();
+  const scrollStyle = useScreenScrollStyle();
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState(user);
   const [cvItems, setCvItems] = useState<any[]>([]);
@@ -123,7 +126,7 @@ export function ProfileScreen({
   };
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={screenStyles.scrollContent}>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={scrollStyle}>
       <ScreenHeader
         title="Profile"
         subtitle="Your learning identity"
@@ -142,7 +145,7 @@ export function ProfileScreen({
             </View>
           </View>
           <View style={commonStyles.flexOne}>
-            <Text style={styles.displayName}>
+            <Text style={[styles.displayName, tc.text]}>
               {form.firstName} {form.lastName}
             </Text>
             <Text style={styles.email}>{form.email}</Text>
@@ -237,7 +240,7 @@ export function ProfileScreen({
       ) : null}
 
       <AppCard>
-        <Text style={styles.sectionLabel}>CV & analysis</Text>
+        <Text style={[styles.sectionLabel, tc.text]}>CV & analysis</Text>
         {cvItems.length === 0 ? (
           <Text style={styles.cvEmpty}>No CV on file yet. Upload a PDF from AI Coach for agent analysis.</Text>
         ) : (
@@ -247,7 +250,7 @@ export function ProfileScreen({
                 <Ionicons name="document-text" size={20} color={palette.primary} />
               </View>
               <View style={commonStyles.flexOne}>
-                <Text style={styles.cvFile}>{cv.file_name}</Text>
+                <Text style={[styles.cvFile, tc.text]}>{cv.file_name}</Text>
                 <Text style={styles.cvDate}>{String(cv.uploaded_at).slice(0, 16).replace("T", " · ")}</Text>
               </View>
               <Pressable
@@ -267,7 +270,7 @@ export function ProfileScreen({
               <View style={styles.cvInsightColumn}>
                 <Text style={styles.cvInsightTitle}>Strengths</Text>
                 {cvInsights.strengths.slice(0, 8).map((line, i) => (
-                  <Text key={`s-${i}`} style={styles.cvBullet}>
+                  <Text key={`s-${i}`} style={[styles.cvBullet, tc.text]}>
                     • {prettifyCvLine(line)}
                   </Text>
                 ))}
@@ -277,7 +280,7 @@ export function ProfileScreen({
               <View style={styles.cvInsightColumn}>
                 <Text style={styles.cvInsightTitle}>Growth areas</Text>
                 {cvInsights.weaknesses.slice(0, 8).map((line, i) => (
-                  <Text key={`w-${i}`} style={styles.cvBullet}>
+                  <Text key={`w-${i}`} style={[styles.cvBullet, tc.text]}>
                     • {prettifyCvLine(line)}
                   </Text>
                 ))}

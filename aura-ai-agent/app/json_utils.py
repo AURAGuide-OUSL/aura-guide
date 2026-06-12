@@ -1,3 +1,4 @@
+import ast
 import json
 import re
 
@@ -6,7 +7,6 @@ def _strip_markdown_fences(text: str) -> str:
     s = (text or "").strip()
     if not s.startswith("```"):
         return s
-    # ```json\n{...}\n```
     lines = s.split("\n")
     if not lines:
         return s
@@ -51,40 +51,99 @@ def _brace_match_object(s: str, start: int) -> str | None:
     return None
 
 
+def _parse_loose_object(chunk: str) -> dict:
+    """Parse JSON or Python dict literals from model output."""
+    try:
+        return json.loads(chunk)
+    except json.JSONDecodeError:
+        pass
+    try:
+        val = ast.literal_eval(chunk)
+        if isinstance(val, dict):
+            return val
+    except (SyntaxError, ValueError):
+        pass
+    # Common LLM mistake: single-quoted keys with unescaped apostrophes in values
+    repaired = chunk.replace("'", '"')
+    try:
+        return json.loads(repaired)
+    except json.JSONDecodeError:
+        pass
+    raise ValueError("could not parse structured model response")
+
+
 def extract_json_object(text: str) -> dict:
-    """Parse first JSON object from model output (handles ``` fences and nested braces)."""
+    """Parse first JSON/dict object from model output (handles fences and nested braces)."""
     s = _strip_markdown_fences(text)
-    # If fences left inline content, strip again
     if "```" in s:
         s = _strip_markdown_fences(s)
     if not s:
         raise ValueError("empty model response")
 
-    # Avoid broken non-greedy regex: find { and brace-match with string awareness
     brace = s.find("{")
     if brace == -1:
         raise ValueError("no JSON object in response")
     chunk = _brace_match_object(s, brace)
     if not chunk:
-        raise ValueError("unbalanced JSON braces")
-    return json.loads(chunk)
+        raise ValueError(
+            "could not read structured response from the model. "
+            "Try a shorter answer without special formatting."
+        )
+    return _parse_loose_object(chunk)
 
 
-def clean_coach_question_text(text: str) -> str:
-    """Normalize interview/reflection question text for chat display."""
+def _pick_display_field(data: dict) -> str:
+    for key in (
+        "question",
+        "feedback",
+        "description",
+        "text",
+        "detail",
+        "content",
+        "summary",
+        "message",
+        "answer",
+    ):
+        val = data.get(key)
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+    for val in data.values():
+        if isinstance(val, str) and len(val.strip()) > 20:
+            return val.strip()
+    return ""
+
+
+def clean_coach_display_text(text: str) -> str:
+    """Normalize interview/reflection/feedback text for chat display."""
     t = _strip_markdown_fences((text or "").strip())
+    if not t:
+        return ""
+
     if t.startswith("{"):
         try:
             data = extract_json_object(t)
-            q = data.get("question")
-            if q is not None:
-                t = str(q).strip()
+            picked = _pick_display_field(data)
+            if picked:
+                t = picked
         except Exception:
-            pass
+            m = re.search(
+                r"['\"]?(?:question|description|feedback)['\"]?\s*:\s*['\"](.+?)['\"]\s*[,}]",
+                t,
+                re.DOTALL | re.IGNORECASE,
+            )
+            if m:
+                t = m.group(1).strip()
+
     t = re.sub(r"\*\*([^*]+)\*\*", r"\1", t)
     t = re.sub(r"^#+\s*", "", t, flags=re.MULTILINE)
     t = re.sub(r"^[`\"']+|[`\"']+$", "", t.strip())
+    if t.startswith("{") and ("'id'" in t or '"id"' in t):
+        return "Please try again — the coach could not format this response. Tap Next question or restart the flow."
     return t.strip()
+
+
+def clean_coach_question_text(text: str) -> str:
+    return clean_coach_display_text(text)
 
 
 def coerce_cv_feedback_line(item: object) -> str:

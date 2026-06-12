@@ -80,9 +80,12 @@ export const api = {
     return response.json();
   },
   async deleteAccount() {
+    const token = await AsyncStorage.getItem("auth_token");
+    if (!token) throw new Error("No auth token found");
     const response = await fetch(`${API_BASE_URL}/users/profile/me`, {
       method: "DELETE",
-      headers: await authHeaders(false),
+      headers: { Authorization: `Bearer ${token}` },
+      ...(Platform.OS === "web" ? { credentials: "include" as RequestCredentials } : {}),
     });
     if (!response.ok) {
       const msg = (await response.text()).trim() || "Delete failed";
@@ -96,39 +99,6 @@ export const api = {
     } catch {
       return { message: "Profile deleted successfully" };
     }
-  },
-  async recordCheckIn() {
-    const response = await fetch(`${API_BASE_URL}/progress/check-in`, {
-      method: "POST",
-      headers: await authHeaders(false),
-    });
-    if (!response.ok) throw new Error(await response.text());
-    return response.json() as Promise<{ day_streak: number }>;
-  },
-  async validateEthicalAnswer(answer: string) {
-    const response = await fetch(`${API_BASE_URL}/aura-ethical-validator/answer`, {
-      method: "POST",
-      headers: await authHeaders(),
-      body: JSON.stringify({ answer }),
-    });
-    if (!response.ok) throw new Error(await response.text());
-    return response.json() as Promise<{ status: string; message: string }>;
-  },
-  async listNotifications() {
-    const response = await fetch(`${API_BASE_URL}/notification/list`, {
-      method: "GET",
-      headers: await authHeaders(false),
-    });
-    if (!response.ok) throw new Error(await response.text());
-    return response.json();
-  },
-  async markAllNotificationsRead() {
-    const response = await fetch(`${API_BASE_URL}/notification/mark-all-read`, {
-      method: "POST",
-      headers: await authHeaders(false),
-    });
-    if (!response.ok) throw new Error(await response.text());
-    return response.json();
   },
   async getCareerPath() {
     const response = await fetch(`${API_BASE_URL}/user/careerPath`, {

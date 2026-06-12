@@ -1,4 +1,6 @@
 import { Dimensions, Platform, StyleSheet } from "react-native";
+import { useMemo } from "react";
+import { useTheme } from "../theme/ThemeContext";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 
@@ -17,3 +19,12 @@ export const screenStyles = StyleSheet.create({
     gap: 16,
   },
 });
+
+/** Scroll content style that respects dark/light theme background. */
+export function useScreenScrollStyle(extra?: object) {
+  const { colors } = useTheme();
+  return useMemo(
+    () => [screenStyles.scrollContent, { backgroundColor: colors.background }, extra],
+    [colors, extra],
+  );
+}
