@@ -22,6 +22,10 @@ import { screenPadding } from "../../styles/screenStyles";
 import { prettifyCvLine } from "../../utils/cvFeedback";
 import { formatCoachFeedback, formatCoachQuestion } from "../../utils/coachText";
 import { showAlert } from "../../utils/alert";
+import { useTheme } from "../../theme/ThemeContext";
+
+const COMPOSER_MIN_HEIGHT = 44;
+const COMPOSER_MAX_HEIGHT = 108;
 
 const PROMPTS = [
   {
@@ -87,8 +91,15 @@ export function AICoachScreen({
   const [cvLocalSummary, setCvLocalSummary] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [fileName, setFileName] = useState("");
-  const [inputHeight, setInputHeight] = useState(44);
+  const [inputHeight, setInputHeight] = useState(COMPOSER_MIN_HEIGHT);
   const scrollRef = useRef<ScrollView>(null);
+  const { colors } = useTheme();
+
+  const resetComposerHeight = useCallback(() => setInputHeight(COMPOSER_MIN_HEIGHT), []);
+  const clearComposerInput = useCallback(() => {
+    setInput("");
+    resetComposerHeight();
+  }, [resetComposerHeight]);
 
   const activeTaskAnswer = useMemo((): PendingTaskAnswerPayload | null => {
     if (phase.kind === "task_answer") return phase.payload;
@@ -96,14 +107,12 @@ export function AICoachScreen({
     return null;
   }, [phase, pendingTaskAnswer]);
 
-  /** Prompt strip + CV: slightly taller on home; stays compact during flows so it stays reachable. */
+  /** Prompt strip only on home — active flows get full chat height for questions. */
+  const showPromptBand = phase.kind === "home";
   const promptBandMaxHeight = useMemo(() => {
-    if (phase.kind === "communication" || phase.kind === "interview" || phase.kind === "reflection") {
-      return Math.min(Math.round(height * 0.18), 140);
-    }
-    const cap = height * (phase.kind === "home" ? 0.28 : 0.22);
-    return Math.min(Math.round(cap), phase.kind === "home" ? 260 : 200);
-  }, [height, phase.kind]);
+    const cap = height * 0.28;
+    return Math.min(Math.round(cap), 260);
+  }, [height]);
 
   const pushAura = useCallback((content: string, category?: string) => {
     setMessages((c) => [
@@ -238,8 +247,8 @@ export function AICoachScreen({
     setShowComposer(false);
     setInterviewShowNext(false);
     setReflectionShowNext(false);
-    setInput("");
-  }, []);
+    clearComposerInput();
+  }, [clearComposerInput]);
 
   const runAssignTask = async () => {
     pushUser("Assign me a new task");
@@ -372,7 +381,7 @@ export function AICoachScreen({
 
     if (phase.kind === "task_answer") {
       pushUser(content);
-      setInput("");
+      clearComposerInput();
       setIsTyping(true);
       try {
         const p = phase.payload;
@@ -397,7 +406,7 @@ export function AICoachScreen({
 
     if (phase.kind === "interview" && phase.awaitingFeedback) {
       pushUser(content);
-      setInput("");
+      clearComposerInput();
       setIsTyping(true);
       try {
         const ev = await api.agentInterviewEvaluate(
@@ -426,7 +435,7 @@ export function AICoachScreen({
 
     if (phase.kind === "reflection" && phase.awaitingFeedback) {
       pushUser(content);
-      setInput("");
+      clearComposerInput();
       setIsTyping(true);
       try {
         const ev = await api.agentReflectionEvaluate(
@@ -455,7 +464,7 @@ export function AICoachScreen({
 
     if (phase.kind === "communication") {
       pushUser(content);
-      setInput("");
+      clearComposerInput();
       setIsTyping(true);
       try {
         const res = await api.agentChat(content, chatSessionId, "communication");
@@ -591,7 +600,7 @@ export function AICoachScreen({
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={[commonStyles.flexOne, { backgroundColor: palette.background }]}
+      style={[commonStyles.flexOne, styles.kavRoot, { backgroundColor: colors.background }]}
     >
       <View style={styles.layoutColumn}>
         <View style={[styles.topBar, { paddingHorizontal: screenPadding }]}>
@@ -612,6 +621,7 @@ export function AICoachScreen({
           ) : null}
         </View>
 
+        {showPromptBand ? (
         <View style={[styles.promptBand, { maxHeight: promptBandMaxHeight }]}>
           <ScrollView
             nestedScrollEnabled
@@ -676,6 +686,7 @@ export function AICoachScreen({
             </View>
           </ScrollView>
         </View>
+        ) : null}
 
         <ScrollView
           ref={scrollRef}
@@ -762,20 +773,29 @@ export function AICoachScreen({
       </View>
 
       {showComposer ? (
-        <View style={[styles.footer, { paddingHorizontal: screenPadding }]}>
-          {composerHint ? <Text style={styles.composerHint}>{composerHint}</Text> : null}
+        <View style={[styles.footer, { paddingHorizontal: screenPadding, backgroundColor: colors.background, borderTopColor: colors.border }]}>
+          {composerHint ? <Text style={[styles.composerHint, { color: colors.muted }]}>{composerHint}</Text> : null}
           <View style={styles.footerRow}>
             <TextInput
               value={input}
               onChangeText={setInput}
               placeholder="Type your message…"
-              placeholderTextColor={palette.muted}
-              style={[styles.footerInput, { height: Math.min(160, Math.max(44, inputHeight)) }]}
+              placeholderTextColor={colors.muted}
+              style={[
+                styles.footerInput,
+                {
+                  height: inputHeight,
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  color: colors.text,
+                },
+              ]}
               multiline
               textAlignVertical="top"
+              scrollEnabled={inputHeight >= COMPOSER_MAX_HEIGHT}
               onContentSizeChange={(e) => {
-                const h = e.nativeEvent.contentSize.height;
-                setInputHeight(Math.min(160, Math.max(44, h + 12)));
+                const next = Math.ceil(e.nativeEvent.contentSize.height) + 8;
+                setInputHeight(Math.min(COMPOSER_MAX_HEIGHT, Math.max(COMPOSER_MIN_HEIGHT, next)));
               }}
             />
             <Pressable accessibilityLabel="Send" onPress={sendComposer} style={styles.sendFab}>
@@ -791,6 +811,9 @@ export function AICoachScreen({
 }
 
 const styles = StyleSheet.create({
+  kavRoot: {
+    flex: 1,
+  },
   topBar: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -902,7 +925,7 @@ const styles = StyleSheet.create({
   },
   chatScroll: {
     flex: 1,
-    minHeight: 280,
+    minHeight: 0,
   },
   taskContextCard: {
     borderLeftWidth: 4,
@@ -1079,11 +1102,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   footer: {
+    flexShrink: 0,
     paddingTop: 8,
     paddingBottom: Platform.OS === "ios" ? 20 : 12,
     borderTopWidth: 1,
-    borderTopColor: palette.border,
-    backgroundColor: palette.background,
   },
   footerPlaceholder: {
     height: Platform.OS === "ios" ? 12 : 6,
@@ -1103,16 +1125,14 @@ const styles = StyleSheet.create({
   },
   footerInput: {
     flex: 1,
-    minHeight: 44,
-    maxHeight: 120,
+    minHeight: COMPOSER_MIN_HEIGHT,
+    maxHeight: COMPOSER_MAX_HEIGHT,
     borderRadius: 22,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: palette.surface,
     borderWidth: 1,
-    borderColor: palette.border,
-    color: palette.text,
     fontSize: 15,
+    lineHeight: 20,
   },
   sendFab: {
     width: 44,

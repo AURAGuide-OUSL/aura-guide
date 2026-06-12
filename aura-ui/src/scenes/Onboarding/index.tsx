@@ -51,6 +51,8 @@ export function OnboardingScreen({
         onboardingSubtitle: { color: colors.muted, lineHeight: 22 },
         sectionCard: { gap: 14 },
         actionRow: { flexDirection: "row", gap: 12 },
+        progressLabel: { fontSize: 13, color: colors.muted, fontWeight: "600" },
+        progressValue: { fontSize: 13, color: colors.text, fontWeight: "700" },
         unsureHint: { fontSize: 13, lineHeight: 20, color: colors.muted, fontWeight: "600" },
       }),
     [colors],
@@ -71,8 +73,8 @@ export function OnboardingScreen({
 
       <AppCard style={styles.sectionCard}>
         <View style={commonStyles.progressSummaryRow}>
-          <Text style={commonStyles.helperText}>Onboarding progress</Text>
-          <Text style={commonStyles.helperText}>{progress}% complete</Text>
+          <Text style={styles.progressLabel}>Onboarding progress</Text>
+          <Text style={styles.progressValue}>{progress}% complete</Text>
         </View>
         <ProgressBar value={progress} />
 

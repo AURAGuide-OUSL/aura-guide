@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { AppCard } from "../../components/AppCard";
@@ -8,25 +8,34 @@ import { TextLink } from "../../components/TextLink";
 import { useTheme } from "../../theme/ThemeContext";
 import { api } from "../../api/api";
 
+export type SignUpDraft = {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  acceptTerms: boolean;
+  showPassword: boolean;
+  emailChecked: boolean;
+};
+
 export function SignUpScreen({
+  draft,
+  onDraftChange,
   onOpenTerms,
   onOpenSignIn,
   onContinue,
 }: {
+  draft: SignUpDraft;
+  onDraftChange: (next: SignUpDraft) => void;
   onOpenTerms: () => void;
   onOpenSignIn: () => void;
   onContinue: (email: string, password: string) => void;
 }) {
   const { colors } = useTheme();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [acceptTerms, setAcceptTerms] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
-  const [emailChecked, setEmailChecked] = useState(false);
-  const [checkingEmail, setCheckingEmail] = useState(false);
+  const [error, setError] = React.useState("");
+  const [checkingEmail, setCheckingEmail] = React.useState(false);
   const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const patch = (partial: Partial<SignUpDraft>) => onDraftChange({ ...draft, ...partial });
 
   const styles = useMemo(
     () =>
@@ -76,10 +85,10 @@ export function SignUpScreen({
   );
 
   const validateEmail = async () => {
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail = draft.email.trim().toLowerCase();
     if (!emailPattern.test(normalizedEmail)) {
       setError("Enter a valid email address.");
-      setEmailChecked(false);
+      patch({ emailChecked: false });
       return false;
     }
 
@@ -87,12 +96,12 @@ export function SignUpScreen({
       setCheckingEmail(true);
       await api.validateSignupEmail(normalizedEmail);
       setError("");
-      setEmailChecked(true);
+      patch({ emailChecked: true });
       return true;
     } catch (err) {
       const message = (err as Error).message || "Email validation failed";
       setError(message);
-      setEmailChecked(false);
+      patch({ emailChecked: false });
       return false;
     } finally {
       setCheckingEmail(false);
@@ -100,26 +109,26 @@ export function SignUpScreen({
   };
 
   const handleContinue = async () => {
-    const isEmailValid = emailChecked ? true : await validateEmail();
+    const isEmailValid = draft.emailChecked ? true : await validateEmail();
     if (!isEmailValid) return;
 
-    if (!email || !password || !confirmPassword) {
+    if (!draft.email || !draft.password || !draft.confirmPassword) {
       setError("Fill in all fields before continuing.");
       return;
     }
 
-    if (password !== confirmPassword) {
+    if (draft.password !== draft.confirmPassword) {
       setError("Passwords do not match.");
       return;
     }
 
-    if (!acceptTerms) {
+    if (!draft.acceptTerms) {
       setError("Accept the terms and conditions to continue.");
       return;
     }
 
     setError("");
-    onContinue(email.trim().toLowerCase(), password);
+    onContinue(draft.email.trim().toLowerCase(), draft.password);
   };
 
   return (
@@ -136,10 +145,9 @@ export function SignUpScreen({
         <InputField
           label="Email"
           placeholder="you@university.edu"
-          value={email}
+          value={draft.email}
           onChangeText={(value) => {
-            setEmail(value);
-            setEmailChecked(false);
+            patch({ email: value, emailChecked: false });
             if (error) setError("");
           }}
           keyboardType="email-address"
@@ -149,34 +157,37 @@ export function SignUpScreen({
         <InputField
           label="Password"
           placeholder="Create a strong password"
-          value={password}
+          value={draft.password}
           onChangeText={async (value) => {
-            if (!emailChecked && !checkingEmail) {
+            if (!draft.emailChecked && !checkingEmail) {
               await validateEmail();
             }
-            setPassword(value);
+            patch({ password: value });
           }}
-          secureTextEntry={!showPassword}
+          secureTextEntry={!draft.showPassword}
           icon={<Feather name="lock" size={18} color={colors.muted} />}
         />
 
         <InputField
           label="Confirm Password"
           placeholder="Re-enter your password"
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          secureTextEntry={!showPassword}
+          value={draft.confirmPassword}
+          onChangeText={(value) => patch({ confirmPassword: value })}
+          secureTextEntry={!draft.showPassword}
           icon={<Feather name="lock" size={18} color={colors.muted} />}
         />
 
         <View style={styles.inlineRow}>
-          <TextLink label={showPassword ? "Hide passwords" : "Show passwords"} onPress={() => setShowPassword((v) => !v)} />
+          <TextLink
+            label={draft.showPassword ? "Hide passwords" : "Show passwords"}
+            onPress={() => patch({ showPassword: !draft.showPassword })}
+          />
           <TextLink label="View terms" onPress={onOpenTerms} />
         </View>
 
-        <Pressable onPress={() => setAcceptTerms((v) => !v)} style={styles.checkboxRow}>
-          <View style={[styles.checkbox, acceptTerms ? styles.checkboxChecked : undefined]}>
-            {acceptTerms ? <Ionicons name="checkmark" size={14} color="#FFFFFF" /> : null}
+        <Pressable onPress={() => patch({ acceptTerms: !draft.acceptTerms })} style={styles.checkboxRow}>
+          <View style={[styles.checkbox, draft.acceptTerms ? styles.checkboxChecked : undefined]}>
+            {draft.acceptTerms ? <Ionicons name="checkmark" size={14} color="#FFFFFF" /> : null}
           </View>
           <Text style={styles.checkboxText}>
             I accept the Terms and Conditions (Last updated: May 2026) and Privacy Policy

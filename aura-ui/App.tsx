@@ -17,7 +17,7 @@ import { BottomTabs } from "./src/components/BottomTabs";
 // Scenes
 import { SplashScreen } from "./src/scenes/Splash";
 import { SignInScreen } from "./src/scenes/SignIn";
-import { SignUpScreen } from "./src/scenes/SignUp";
+import { SignUpScreen, SignUpDraft } from "./src/scenes/SignUp";
 import { ResetPasswordScreen } from "./src/scenes/ResetPassword";
 import { OnboardingScreen } from "./src/scenes/Onboarding";
 import { DashboardScreen } from "./src/scenes/Dashboard";
@@ -40,6 +40,15 @@ const goalIdToLabel: Record<number, string> = {
   4: "DevOps Engineer",
 };
 
+const emptySignUpDraft: SignUpDraft = {
+  email: "",
+  password: "",
+  confirmPassword: "",
+  acceptTerms: false,
+  showPassword: false,
+  emailChecked: false,
+};
+
 export default function App() {
   const [route, setRoute] = useState<Route>("splash");
   const [tab, setTab] = useState<TabRoute>("dashboard");
@@ -51,6 +60,7 @@ export default function App() {
     darkMode: false,
     language: "English (US)",
   });
+  const [signupDraft, setSignupDraft] = useState<SignUpDraft>(emptySignUpDraft);
   const [termsBackRoute, setTermsBackRoute] = useState<Route>("signup");
   const [pendingAgentTask, setPendingAgentTask] = useState<PendingTaskAnswerPayload | undefined>(undefined);
   const [isReturningUser, setIsReturningUser] = useState(true);
@@ -164,6 +174,7 @@ export default function App() {
   const handleSignUp = (email: string, password?: string) => {
     setUser((prev) => ({ ...prev, email }));
     if (password) setTempPassword(password);
+    setSignupDraft(emptySignUpDraft);
     setRoute("onboarding");
   };
 
@@ -217,11 +228,16 @@ export default function App() {
       case "signup":
         return (
           <SignUpScreen
+            draft={signupDraft}
+            onDraftChange={setSignupDraft}
             onOpenTerms={() => {
               setTermsBackRoute("signup");
               setRoute("terms");
             }}
-            onOpenSignIn={() => setRoute("signin")}
+            onOpenSignIn={() => {
+              setSignupDraft(emptySignUpDraft);
+              setRoute("signin");
+            }}
             onContinue={handleSignUp}
           />
         );
