@@ -25,5 +25,3 @@ export function ThemeProvider({ isDark, children }: { isDark: boolean; children:
 export function useTheme() {
   return useContext(ThemeContext);
 }
-
-export type { ThemeColors };

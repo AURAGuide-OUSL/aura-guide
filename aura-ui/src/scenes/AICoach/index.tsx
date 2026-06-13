@@ -20,7 +20,12 @@ import { Message } from "../../types";
 import { api } from "../../api/api";
 import { screenPadding } from "../../styles/screenStyles";
 import { prettifyCvLine } from "../../utils/cvFeedback";
-import { formatCoachQuestion } from "../../utils/coachText";
+import { formatCoachFeedback, formatCoachQuestion } from "../../utils/coachText";
+import { showAlert } from "../../utils/alert";
+import { useTheme } from "../../theme/ThemeContext";
+
+const COMPOSER_MIN_HEIGHT = 44;
+const COMPOSER_MAX_HEIGHT = 108;
 
 const PROMPTS = [
   {
@@ -82,11 +87,19 @@ export function AICoachScreen({
   /** Input bar hidden until user picks a path or opens task answer from Tasks. */
   const [showComposer, setShowComposer] = useState(false);
   const [reflectionShowNext, setReflectionShowNext] = useState(false);
+  const [interviewShowNext, setInterviewShowNext] = useState(false);
   const [cvLocalSummary, setCvLocalSummary] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [fileName, setFileName] = useState("");
-  const [interviewShowNext, setInterviewShowNext] = useState(false);
+  const [inputHeight, setInputHeight] = useState(COMPOSER_MIN_HEIGHT);
   const scrollRef = useRef<ScrollView>(null);
+  const { colors } = useTheme();
+
+  const resetComposerHeight = useCallback(() => setInputHeight(COMPOSER_MIN_HEIGHT), []);
+  const clearComposerInput = useCallback(() => {
+    setInput("");
+    resetComposerHeight();
+  }, [resetComposerHeight]);
 
   const activeTaskAnswer = useMemo((): PendingTaskAnswerPayload | null => {
     if (phase.kind === "task_answer") return phase.payload;
@@ -94,11 +107,12 @@ export function AICoachScreen({
     return null;
   }, [phase, pendingTaskAnswer]);
 
-  /** Prompt strip + CV: slightly taller on home; stays compact during flows so it stays reachable. */
+  /** Prompt strip only on home — active flows get full chat height for questions. */
+  const showPromptBand = phase.kind === "home";
   const promptBandMaxHeight = useMemo(() => {
-    const cap = height * (phase.kind === "home" ? 0.36 : 0.3);
-    return Math.min(Math.round(cap), phase.kind === "home" ? 320 : 260);
-  }, [height, phase.kind]);
+    const cap = height * 0.28;
+    return Math.min(Math.round(cap), 260);
+  }, [height]);
 
   const pushAura = useCallback((content: string, category?: string) => {
     setMessages((c) => [
@@ -233,8 +247,8 @@ export function AICoachScreen({
     setShowComposer(false);
     setInterviewShowNext(false);
     setReflectionShowNext(false);
-    setInput("");
-  }, []);
+    clearComposerInput();
+  }, [clearComposerInput]);
 
   const runAssignTask = async () => {
     pushUser("Assign me a new task");
@@ -291,9 +305,9 @@ export function AICoachScreen({
     try {
       const res = await api.agentChat(label, null, "communication");
       setChatSessionId(res.session_id);
-      pushAura(res.reply, "Communication");
+      pushAura(formatCoachFeedback(res.reply), "Communication");
       if (res.follow_up?.trim()) {
-        pushAura(res.follow_up.trim(), "Review");
+        pushAura(formatCoachFeedback(res.follow_up.trim()), "Review");
       }
     } catch (e) {
       pushAura(`Something went wrong: ${(e as Error).message}`, "Error");
@@ -365,24 +379,9 @@ export function AICoachScreen({
     const content = input.trim();
     if (!content) return;
 
-    const ethicsOk = async () => {
-      try {
-        const ethics = await api.validateEthicalAnswer(content);
-        if (ethics.status === "unethical") {
-          pushAura(ethics.message, "Review");
-          return false;
-        }
-      } catch (e) {
-        pushAura(`Ethical check failed: ${(e as Error).message}`, "Error");
-        return false;
-      }
-      return true;
-    };
-
     if (phase.kind === "task_answer") {
-      if (!(await ethicsOk())) return;
       pushUser(content);
-      setInput("");
+      clearComposerInput();
       setIsTyping(true);
       try {
         const p = phase.payload;
@@ -394,7 +393,7 @@ export function AICoachScreen({
           session_id: chatSessionId ?? undefined,
         });
         setChatSessionId(res.session_id);
-        pushAura(res.feedback_message || "Thanks - review your skill matrix on Goals.", "Feedback");
+        pushAura(formatCoachFeedback(res.feedback_message || "Thanks - review your skill matrix on Goals."), "Feedback");
         setPhase({ kind: "home" });
         setShowComposer(false);
       } catch (e) {
@@ -406,9 +405,8 @@ export function AICoachScreen({
     }
 
     if (phase.kind === "interview" && phase.awaitingFeedback) {
-      if (!(await ethicsOk())) return;
       pushUser(content);
-      setInput("");
+      clearComposerInput();
       setIsTyping(true);
       try {
         const ev = await api.agentInterviewEvaluate(
@@ -418,7 +416,7 @@ export function AICoachScreen({
           chatSessionId,
         );
         setChatSessionId(ev.session_id);
-        pushAura(ev.feedback, "Feedback");
+        pushAura(formatCoachFeedback(ev.feedback), "Feedback");
         setInterviewShowNext(true);
         setShowComposer(false);
         setPhase({
@@ -436,9 +434,8 @@ export function AICoachScreen({
     }
 
     if (phase.kind === "reflection" && phase.awaitingFeedback) {
-      if (!(await ethicsOk())) return;
       pushUser(content);
-      setInput("");
+      clearComposerInput();
       setIsTyping(true);
       try {
         const ev = await api.agentReflectionEvaluate(
@@ -448,7 +445,7 @@ export function AICoachScreen({
           chatSessionId,
         );
         setChatSessionId(ev.session_id);
-        pushAura(ev.feedback, "Feedback");
+        pushAura(formatCoachFeedback(ev.feedback), "Feedback");
         setReflectionShowNext(true);
         setShowComposer(false);
         setPhase({
@@ -466,16 +463,15 @@ export function AICoachScreen({
     }
 
     if (phase.kind === "communication") {
-      if (!(await ethicsOk())) return;
       pushUser(content);
-      setInput("");
+      clearComposerInput();
       setIsTyping(true);
       try {
         const res = await api.agentChat(content, chatSessionId, "communication");
         setChatSessionId(res.session_id);
-        pushAura(res.reply, "Communication");
+        pushAura(formatCoachFeedback(res.reply), "Communication");
         if (res.follow_up?.trim()) {
-          pushAura(res.follow_up.trim(), "Review");
+          pushAura(formatCoachFeedback(res.follow_up.trim()), "Review");
         }
         const ended =
           res.reply.trim() === "Session ended. Good job today!" ||
@@ -527,9 +523,25 @@ export function AICoachScreen({
       const lower = name.toLowerCase();
       const mime = (asset.mimeType || "").toLowerCase();
       const pdfMsg =
-        "Only .pdf files can be uploaded as your CV. Other formats are not accepted - export your document as PDF and try again.";
+        "Only PDF files can be uploaded as your CV. Word, text, and other document types are not accepted — export your CV as PDF and try again.";
+      const blockedExt = [".doc", ".docx", ".txt", ".rtf", ".odt", ".pages", ".md"];
+      if (blockedExt.some((ext) => lower.endsWith(ext))) {
+        showAlert("PDF only", pdfMsg);
+        return;
+      }
+      const blockedMime =
+        mime.startsWith("text/") ||
+        mime.includes("msword") ||
+        mime.includes("wordprocessingml") ||
+        mime.includes("opendocument") ||
+        mime === "application/rtf" ||
+        mime === "application/json";
+      if (blockedMime) {
+        showAlert("PDF only", pdfMsg);
+        return;
+      }
       if (!lower.endsWith(".pdf")) {
-        Alert.alert("PDF only", pdfMsg);
+        showAlert("PDF only", pdfMsg);
         return;
       }
       if (mime) {
@@ -539,7 +551,7 @@ export function AICoachScreen({
           mime.endsWith("+pdf") ||
           (mime === "application/octet-stream" && lower.endsWith(".pdf"));
         if (!looksPdf) {
-          Alert.alert("PDF only", pdfMsg);
+          showAlert("PDF only", pdfMsg);
           return;
         }
       }
@@ -566,9 +578,9 @@ export function AICoachScreen({
       const summary = prettifyBulletLines(summaryRaw);
       setCvLocalSummary(summary);
       pushAura(`Here's your CV feedback.\n\n${summary}\n\n_Saved under Profile › CV & analysis._`, "CV feedback");
-      Alert.alert("CV feedback ready", "Strengths and growth areas are saved. View them anytime on Profile.");
+      showAlert("CV feedback ready", "Strengths and growth areas are saved. View them anytime on Profile.");
     } catch (e) {
-      Alert.alert("Upload failed", (e as Error).message);
+      showAlert("Upload failed", (e as Error).message);
     } finally {
       setIsUploading(false);
     }
@@ -588,7 +600,7 @@ export function AICoachScreen({
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={[commonStyles.flexOne, { backgroundColor: palette.background }]}
+      style={[commonStyles.flexOne, styles.kavRoot, { backgroundColor: colors.background }]}
     >
       <View style={styles.layoutColumn}>
         <View style={[styles.topBar, { paddingHorizontal: screenPadding }]}>
@@ -609,6 +621,7 @@ export function AICoachScreen({
           ) : null}
         </View>
 
+        {showPromptBand ? (
         <View style={[styles.promptBand, { maxHeight: promptBandMaxHeight }]}>
           <ScrollView
             nestedScrollEnabled
@@ -673,6 +686,7 @@ export function AICoachScreen({
             </View>
           </ScrollView>
         </View>
+        ) : null}
 
         <ScrollView
           ref={scrollRef}
@@ -759,16 +773,30 @@ export function AICoachScreen({
       </View>
 
       {showComposer ? (
-        <View style={[styles.footer, { paddingHorizontal: screenPadding }]}>
-          {composerHint ? <Text style={styles.composerHint}>{composerHint}</Text> : null}
+        <View style={[styles.footer, { paddingHorizontal: screenPadding, backgroundColor: colors.background, borderTopColor: colors.border }]}>
+          {composerHint ? <Text style={[styles.composerHint, { color: colors.muted }]}>{composerHint}</Text> : null}
           <View style={styles.footerRow}>
             <TextInput
               value={input}
               onChangeText={setInput}
               placeholder="Type your message…"
-              placeholderTextColor={palette.muted}
-              style={styles.footerInput}
+              placeholderTextColor={colors.muted}
+              style={[
+                styles.footerInput,
+                {
+                  height: inputHeight,
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  color: colors.text,
+                },
+              ]}
               multiline
+              textAlignVertical="top"
+              scrollEnabled={inputHeight >= COMPOSER_MAX_HEIGHT}
+              onContentSizeChange={(e) => {
+                const next = Math.ceil(e.nativeEvent.contentSize.height) + 8;
+                setInputHeight(Math.min(COMPOSER_MAX_HEIGHT, Math.max(COMPOSER_MIN_HEIGHT, next)));
+              }}
             />
             <Pressable accessibilityLabel="Send" onPress={sendComposer} style={styles.sendFab}>
               <Ionicons name="send" size={20} color="#FFFFFF" />
@@ -783,6 +811,9 @@ export function AICoachScreen({
 }
 
 const styles = StyleSheet.create({
+  kavRoot: {
+    flex: 1,
+  },
   topBar: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -1071,11 +1102,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   footer: {
+    flexShrink: 0,
     paddingTop: 8,
     paddingBottom: Platform.OS === "ios" ? 20 : 12,
     borderTopWidth: 1,
-    borderTopColor: palette.border,
-    backgroundColor: palette.background,
   },
   footerPlaceholder: {
     height: Platform.OS === "ios" ? 12 : 6,
@@ -1095,16 +1125,14 @@ const styles = StyleSheet.create({
   },
   footerInput: {
     flex: 1,
-    minHeight: 44,
-    maxHeight: 120,
+    minHeight: COMPOSER_MIN_HEIGHT,
+    maxHeight: COMPOSER_MAX_HEIGHT,
     borderRadius: 22,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: palette.surface,
     borderWidth: 1,
-    borderColor: palette.border,
-    color: palette.text,
     fontSize: 15,
+    lineHeight: 20,
   },
   sendFab: {
     width: 44,

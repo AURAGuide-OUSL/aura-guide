@@ -6,7 +6,12 @@ from typing import Any
 from psycopg.types.json import Json
 
 from app.db import get_conn
-from app.json_utils import as_str_list, clean_coach_question_text, extract_json_object
+from app.json_utils import (
+    as_str_list,
+    clean_coach_display_text,
+    clean_coach_question_text,
+    extract_json_object,
+)
 from app.ollama_client import structured_completion
 from app.skills_repo import skill_id, status_id_by_name, upsert_user_skill_score
 
@@ -288,7 +293,7 @@ OUTPUT FORMAT:
             data = extract_json_object(raw2)
         score = int(data.get("score") or 2)
         score = max(1, min(3, score))
-        feedback = str(data.get("feedback") or "").strip()
+        feedback = clean_coach_display_text(str(data.get("feedback") or ""))
     except Exception:
         score = 2
         feedback = (
@@ -361,7 +366,9 @@ OUTPUT FORMAT:
         data = extract_json_object(raw2)
     score = int(data.get("score") or 2)
     score = max(1, min(3, score))
-    feedback = str(data.get("feedback") or data.get("Feedback") or "").strip()
+    feedback = clean_coach_display_text(
+        str(data.get("feedback") or data.get("Feedback") or "")
+    )
     if not feedback:
         feedback = "Review your messages for clarity, tone, and the 7Cs (clear through courteous)."
     return {"score": score, "feedback": feedback}
@@ -469,7 +476,7 @@ OUTPUT FORMAT:
             data = extract_json_object(raw2)
         score = int(data.get("score") or 2)
         score = max(1, min(3, score))
-        feedback = str(data.get("feedback") or "").strip()
+        feedback = clean_coach_display_text(str(data.get("feedback") or ""))
     except Exception:
         score = 2
         feedback = (
@@ -757,7 +764,7 @@ TASK_DESCRIPTION:
 SKILL: {skill_name}
 
 USER_ANSWER:
-{user_answer}
+{user_answer[:12000]}
 
 USER_GOAL: {row['goal_name']}
 
@@ -773,10 +780,35 @@ OUTPUT FORMAT (STRICT JSON ONLY)
 
 "feedback" must address only this skill. "improvement_tip" must be one actionable sentence or empty."""
 
-    raw = await structured_completion(system, user)
-    data = extract_json_object(raw)
+    try:
+        raw = await structured_completion(system, user)
+        data = extract_json_object(raw)
+    except Exception:
+        try:
+            raw2 = await structured_completion(
+                system,
+                user
+                + "\n\nYour last reply was not valid JSON. Output ONLY one JSON object with keys "
+                "skill, score (1-3), feedback (string), improvement_tip (string). No markdown.",
+            )
+            data = extract_json_object(raw2)
+        except Exception:
+            data = {
+                "score": 2,
+                "feedback": (
+                    "Your answer shows effort. For algorithmic tasks, break the solution into clear steps: "
+                    "problem understanding, approach, and expected outcome."
+                ),
+                "improvement_tip": "Use numbered steps and name data structures or algorithms explicitly.",
+            }
+
     score = max(1, min(3, int(data.get("score") or 2)))
-    feedback = str(data.get("feedback") or "").strip()
+    feedback = clean_coach_display_text(str(data.get("feedback") or ""))
+    if not feedback:
+        feedback = (
+            "Thanks for submitting your answer. Review the task criteria and try to be more "
+            "specific with examples and reasoning next time."
+        )
     tip = str(data.get("improvement_tip") or "").strip()
 
     with get_conn() as conn:

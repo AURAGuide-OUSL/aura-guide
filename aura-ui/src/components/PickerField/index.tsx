@@ -1,7 +1,7 @@
-import React, { ReactNode } from "react";
+import React, { ReactNode, useMemo } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
 import { Picker } from "@react-native-picker/picker";
-import { palette } from "../../theme";
+import { useTheme } from "../../theme/ThemeContext";
 
 export function PickerField({
   label,
@@ -14,6 +14,31 @@ export function PickerField({
   onValueChange: (value: string) => void;
   children: ReactNode;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        inputGroup: { gap: 8 },
+        inputLabel: { fontSize: 14, fontWeight: "700", color: colors.text },
+        pickerWrapper: {
+          height: 52,
+          borderRadius: 16,
+          backgroundColor: colors.surfaceMuted,
+          borderWidth: 1,
+          borderColor: colors.border,
+          justifyContent: "center",
+        },
+        picker: {
+          marginHorizontal: 8,
+          color: colors.text,
+          backgroundColor: "transparent",
+          borderWidth: 0,
+          ...(Platform.OS === "web" ? ({ paddingRight: 28 } as any) : {}),
+        },
+      }),
+    [colors],
+  );
+
   return (
     <View style={styles.inputGroup}>
       <Text style={styles.inputLabel}>{label}</Text>
@@ -32,7 +57,7 @@ export function PickerField({
                 } as any)
               : null,
           ]}
-          dropdownIconColor={palette.primary}
+          dropdownIconColor={colors.primary}
         >
           {children}
         </Picker>
@@ -40,29 +65,3 @@ export function PickerField({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  inputGroup: {
-    gap: 8,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: palette.text,
-  },
-  pickerWrapper: {
-    height: 52,
-    borderRadius: 16,
-    backgroundColor: "#F8FBFF",
-    borderWidth: 1,
-    borderColor: palette.border,
-    justifyContent: "center",
-  },
-  picker: {
-    marginHorizontal: 8,
-    color: palette.text,
-    backgroundColor: "transparent",
-    borderWidth: 0,
-    ...(Platform.OS === "web" ? ({ paddingRight: 28 } as any) : {}),
-  },
-});

@@ -13,7 +13,6 @@ func runMigrations(ctx context.Context) error {
 	}{
 		{"unique indexes", ensureUniqueIndexes},
 		{"dedupe reference tables", dedupeReferenceTables},
-		{"dedupe user_skills", dedupeUserSkills},
 		{"seed statuses", seedAllStatuses},
 		{"seed goal skill matrix", seedGoalSkillMatrix},
 		{"purge legacy auto plan tasks", purgeLegacyAutoPlanTasks},
@@ -33,11 +32,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS category_name_unique ON category (lower(trim(n
 CREATE UNIQUE INDEX IF NOT EXISTS goals_name_unique ON goals (lower(trim(name)));
 CREATE UNIQUE INDEX IF NOT EXISTS skills_name_unique ON skills (lower(trim(name)));
 CREATE UNIQUE INDEX IF NOT EXISTS gsm_goal_skill_unique ON goal_skill_matrix (goal_id, skill_id);
-CREATE UNIQUE INDEX IF NOT EXISTS user_skills_user_skill_unique ON user_skills (user_id, skill_id);
 ALTER TABLE user_cv_analysis ADD COLUMN IF NOT EXISTS file_path TEXT;
 ALTER TABLE user_cv_analysis ADD COLUMN IF NOT EXISTS file_size BIGINT;
 ALTER TABLE user_notification ADD COLUMN IF NOT EXISTS title VARCHAR(255);
 ALTER TABLE user_notification ADD COLUMN IF NOT EXISTS notification_type VARCHAR(64) DEFAULT 'reminder';
+DROP INDEX IF EXISTS user_skills_user_skill_unique;
 `)
 	return err
 }

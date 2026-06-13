@@ -57,14 +57,15 @@ func GetGoalSummaryByEmail(ctx context.Context, email string) (*goal.GoalSummary
 	result.SkillAverage = am.Average
 	result.SkillReadinessLabel = am.ReadinessLabel
 
-	rec, _ := UpdateCareerRecommendationIfReady(ctx, userID, goalID, result.CareerTitle, result.SkillReadinessLabel, am.Average)
-	if rec != "" {
+	rec, err := UpdateCareerRecommendationIfReady(ctx, userID, goalID, result.CareerTitle, am.ReadinessLabel, am.Average)
+	if err != nil {
+		log.Printf("career recommendation: %v", err)
+	} else if rec != "" {
 		result.Recommendation = rec
 	} else {
-		var stored *string
-		_ = db.Pool.QueryRow(ctx, `SELECT recommendation FROM user_student WHERE id = $1`, userID).Scan(&stored)
-		if stored != nil {
-			result.Recommendation = strings.TrimSpace(*stored)
+		var stored string
+		if err := db.Pool.QueryRow(ctx, `SELECT COALESCE(recommendation, '') FROM user_student WHERE id = $1`, userID).Scan(&stored); err == nil && strings.TrimSpace(stored) != "" {
+			result.Recommendation = stored
 		}
 	}
 
@@ -75,17 +76,16 @@ func GetGoalSummaryByEmail(ctx context.Context, email string) (*goal.GoalSummary
 	rows, err := db.Pool.Query(ctx, `SELECT DISTINCT ON (s.id)
 		s.id, s.name, COALESCE(c.name, ''), gsm.score_id,
 		COALESCE(us.avg_score, 0),
-		COALESCE(req.level, ''), COALESCE(cur.level, '')
+		COALESCE(req.level, '')
 		FROM goal_skill_matrix gsm
 		JOIN skills s ON s.id = gsm.skill_id
 		LEFT JOIN category c ON c.id = s.category_id
 		LEFT JOIN LATERAL (
-			SELECT ROUND(AVG(us2.score_id)::numeric, 2) AS avg_score
+			SELECT AVG(us2.score_id::double precision) AS avg_score
 			FROM user_skills us2
 			WHERE us2.user_id = $1 AND us2.skill_id = s.id
 		) us ON true
 		LEFT JOIN skill_matrix_levels req ON req.score_id = gsm.score_id
-		LEFT JOIN skill_matrix_levels cur ON cur.score_id = GREATEST(1, LEAST(3, ROUND(COALESCE(us.avg_score, 0))::int))
 		WHERE gsm.goal_id = $2
 		ORDER BY s.id, gsm.id`, userID, *goalID)
 	if err != nil {
@@ -103,7 +103,6 @@ func GetGoalSummaryByEmail(ctx context.Context, email string) (*goal.GoalSummary
 			&item.RequiredScore,
 			&avgScore,
 			&item.RequiredLevel,
-			&item.CurrentLevel,
 		); err != nil {
 			return nil, err
 		}
@@ -112,11 +111,10 @@ func GetGoalSummaryByEmail(ctx context.Context, email string) (*goal.GoalSummary
 			item.CurrentPct = 0
 			item.CurrentLevel = "Not assessed"
 		} else {
+			avgScore = math.Round(avgScore*100) / 100
 			item.CurrentScore = int(math.Round(avgScore))
 			item.CurrentPct = avgScoreToPercent(avgScore)
-			if item.CurrentLevel == "" {
-				item.CurrentLevel = avgScoreToLevel(avgScore)
-			}
+			item.CurrentLevel = avgScoreToLevel(avgScore)
 		}
 		if item.RequiredLevel == "" {
 			item.RequiredLevel = scoreIDToLevel(item.RequiredScore)

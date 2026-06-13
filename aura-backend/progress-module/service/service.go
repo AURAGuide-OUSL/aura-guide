@@ -24,5 +24,9 @@ func GetDashboardSummary(ctx context.Context, email string) (*progress.Dashboard
 }
 
 func RecordCheckIn(ctx context.Context, email string) (int, error) {
-	return dao.RecordDailyLoginByEmail(ctx, email)
+	userID, err := dao.UserIDForEmail(ctx, email)
+	if err != nil {
+		return 0, err
+	}
+	return dao.RecordDailyCheckIn(ctx, userID)
 }

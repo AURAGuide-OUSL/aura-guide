@@ -1,10 +1,12 @@
 import React, { useMemo } from "react";
-import { Alert, ScrollView, StyleSheet, Switch, Text, View, Pressable } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { confirmAction, showAlert } from "../../utils/alert";
+import { useScreenScrollStyle } from "../../styles/screenStyles";
+import { useTheme } from "../../theme/ThemeContext";
 import { AppCard } from "../../components/AppCard";
 import { PrimaryButton } from "../../components/PrimaryButton";
 import { ScreenHeader } from "../../components/ScreenHeader";
-import { useTheme } from "../../theme/ThemeContext";
 
 export function SettingsScreen({
   values,
@@ -22,16 +24,11 @@ export function SettingsScreen({
   onDeleteAccount?: () => Promise<void>;
 }) {
   const { colors } = useTheme();
+  const scrollStyle = useScreenScrollStyle({ paddingTop: 8, paddingBottom: 40, gap: 20 });
+
   const styles = useMemo(
     () =>
       StyleSheet.create({
-        screenContent: {
-          paddingHorizontal: 20,
-          paddingTop: 8,
-          paddingBottom: 40,
-          gap: 20,
-          backgroundColor: colors.background,
-        },
         sectionCard: { padding: 16, gap: 16 },
         sectionTitle: {
           fontSize: 14,
@@ -41,41 +38,12 @@ export function SettingsScreen({
           letterSpacing: 1,
         },
         rows: { gap: 20 },
-        settingsRow: {
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-        },
-        rowLabel: {
-          flexDirection: "row",
-          alignItems: "flex-start",
-          gap: 12,
-          flex: 1,
-          marginRight: 8,
-        },
-        rowMeta: {
-          fontSize: 12,
-          color: colors.muted,
-          marginTop: 2,
-          fontWeight: "600",
-        },
-        iconCircle: {
-          width: 40,
-          height: 40,
-          borderRadius: 12,
-          alignItems: "center",
-          justifyContent: "center",
-        },
-        rowText: {
-          fontSize: 16,
-          fontWeight: "700",
-          color: colors.text,
-        },
-        valueText: {
-          fontSize: 14,
-          fontWeight: "600",
-          color: colors.muted,
-        },
+        settingsRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+        rowLabel: { flexDirection: "row", alignItems: "flex-start", gap: 12, flex: 1, marginRight: 8 },
+        rowMeta: { fontSize: 12, color: colors.muted, marginTop: 2, fontWeight: "600" },
+        iconCircle: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+        rowText: { fontSize: 16, fontWeight: "700", color: colors.text },
+        valueText: { fontSize: 14, fontWeight: "600", color: colors.muted },
         footer: { marginTop: 12, gap: 16 },
         deleteAccountBtn: { alignItems: "center", paddingVertical: 12 },
         deleteAccountText: { color: colors.danger, fontWeight: "800", fontSize: 15 },
@@ -85,30 +53,22 @@ export function SettingsScreen({
   );
 
   const confirmDelete = () => {
-    Alert.alert(
-      "Delete account",
-      "This permanently removes your profile, tasks, scores, and chat history. This cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            void (async () => {
-              try {
-                await onDeleteAccount?.();
-              } catch (e) {
-                Alert.alert("Delete failed", (e as Error).message);
-              }
-            })();
-          },
-        },
-      ],
-    );
+    void (async () => {
+      const ok = await confirmAction(
+        "Delete account",
+        "This permanently removes your profile, tasks, scores, and chat history. This cannot be undone.",
+      );
+      if (!ok) return;
+      try {
+        await onDeleteAccount?.();
+      } catch (e) {
+        showAlert("Delete failed", (e as Error).message);
+      }
+    })();
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.screenContent}>
+    <ScrollView contentContainerStyle={scrollStyle}>
       <ScreenHeader title="Settings" subtitle="Preferences & account" onBack={onBack} />
 
       <AppCard style={styles.sectionCard}>
@@ -143,7 +103,7 @@ export function SettingsScreen({
               value={values.notifications}
               onValueChange={(notifications) => onChange({ ...values, notifications })}
               trackColor={{ false: colors.border, true: colors.primaryMuted }}
-              thumbColor={values.notifications ? colors.primary : colors.surfaceMuted}
+              thumbColor={values.notifications ? colors.primary : "#f4f3f4"}
             />
           </View>
 
@@ -158,7 +118,7 @@ export function SettingsScreen({
               value={values.darkMode}
               onValueChange={(darkMode) => onChange({ ...values, darkMode })}
               trackColor={{ false: colors.border, true: colors.primaryMuted }}
-              thumbColor={values.darkMode ? colors.primary : colors.surfaceMuted}
+              thumbColor={values.darkMode ? colors.primary : "#f4f3f4"}
             />
           </View>
 

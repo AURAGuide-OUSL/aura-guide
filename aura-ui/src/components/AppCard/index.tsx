@@ -3,15 +3,7 @@ import { StyleSheet, View } from "react-native";
 import { cardShadow } from "../../theme";
 import { useTheme } from "../../theme/ThemeContext";
 
-export function AppCard({
-  children,
-  style,
-  variant = "default",
-}: {
-  children: ReactNode;
-  style?: object;
-  variant?: "default" | "muted";
-}) {
+export function AppCard({ children, style, variant = "default" }: { children: ReactNode; style?: object; variant?: "default" | "muted" }) {
   const { colors } = useTheme();
   const styles = useMemo(
     () =>

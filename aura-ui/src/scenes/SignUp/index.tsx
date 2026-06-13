@@ -1,37 +1,94 @@
-import React, { useState } from "react";
+import React, { useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
-import { palette } from "../../theme";
 import { AppCard } from "../../components/AppCard";
 import { InputField } from "../../components/InputField";
 import { PrimaryButton } from "../../components/PrimaryButton";
 import { TextLink } from "../../components/TextLink";
+import { useTheme } from "../../theme/ThemeContext";
 import { api } from "../../api/api";
 
+export type SignUpDraft = {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  acceptTerms: boolean;
+  showPassword: boolean;
+  emailChecked: boolean;
+};
+
 export function SignUpScreen({
+  draft,
+  onDraftChange,
   onOpenTerms,
   onOpenSignIn,
   onContinue,
 }: {
+  draft: SignUpDraft;
+  onDraftChange: (next: SignUpDraft) => void;
   onOpenTerms: () => void;
   onOpenSignIn: () => void;
   onContinue: (email: string, password: string) => void;
 }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [acceptTerms, setAcceptTerms] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
-  const [emailChecked, setEmailChecked] = useState(false);
-  const [checkingEmail, setCheckingEmail] = useState(false);
+  const { colors } = useTheme();
+  const [error, setError] = React.useState("");
+  const [checkingEmail, setCheckingEmail] = React.useState(false);
   const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+  const patch = (partial: Partial<SignUpDraft>) => onDraftChange({ ...draft, ...partial });
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        authScroll: {
+          paddingHorizontal: 20,
+          paddingVertical: 28,
+          justifyContent: "center",
+          minHeight: "100%",
+          gap: 18,
+          backgroundColor: colors.background,
+        },
+        authHero: { alignItems: "center", gap: 10 },
+        logoBubble: {
+          width: 74,
+          height: 74,
+          borderRadius: 24,
+          backgroundColor: colors.surface,
+          alignItems: "center",
+          justifyContent: "center",
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        authTitle: { fontSize: 30, fontWeight: "800", color: colors.text, textAlign: "center" },
+        authSubtitle: { maxWidth: 300, textAlign: "center", color: colors.muted, lineHeight: 22 },
+        authCard: { gap: 14 },
+        authFooter: { flexDirection: "row", justifyContent: "center", gap: 6, alignItems: "center" },
+        authFooterText: { color: colors.muted },
+        inlineRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
+        checkboxRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+        checkbox: {
+          width: 20,
+          height: 20,
+          borderRadius: 6,
+          borderWidth: 1,
+          borderColor: colors.border,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: colors.surface,
+        },
+        checkboxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
+        checkboxText: { flex: 1, color: colors.muted, lineHeight: 20 },
+        errorText: { color: colors.danger, fontWeight: "600" },
+        actionsRow: { flexDirection: "row", gap: 12 },
+      }),
+    [colors],
+  );
+
   const validateEmail = async () => {
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail = draft.email.trim().toLowerCase();
     if (!emailPattern.test(normalizedEmail)) {
       setError("Enter a valid email address.");
-      setEmailChecked(false);
+      patch({ emailChecked: false });
       return false;
     }
 
@@ -39,12 +96,12 @@ export function SignUpScreen({
       setCheckingEmail(true);
       await api.validateSignupEmail(normalizedEmail);
       setError("");
-      setEmailChecked(true);
+      patch({ emailChecked: true });
       return true;
     } catch (err) {
       const message = (err as Error).message || "Email validation failed";
       setError(message);
-      setEmailChecked(false);
+      patch({ emailChecked: false });
       return false;
     } finally {
       setCheckingEmail(false);
@@ -52,33 +109,33 @@ export function SignUpScreen({
   };
 
   const handleContinue = async () => {
-    const isEmailValid = emailChecked ? true : await validateEmail();
+    const isEmailValid = draft.emailChecked ? true : await validateEmail();
     if (!isEmailValid) return;
 
-    if (!email || !password || !confirmPassword) {
+    if (!draft.email || !draft.password || !draft.confirmPassword) {
       setError("Fill in all fields before continuing.");
       return;
     }
 
-    if (password !== confirmPassword) {
+    if (draft.password !== draft.confirmPassword) {
       setError("Passwords do not match.");
       return;
     }
 
-    if (!acceptTerms) {
+    if (!draft.acceptTerms) {
       setError("Accept the terms and conditions to continue.");
       return;
     }
 
     setError("");
-    onContinue(email.trim().toLowerCase(), password);
+    onContinue(draft.email.trim().toLowerCase(), draft.password);
   };
 
   return (
     <ScrollView contentContainerStyle={styles.authScroll}>
       <View style={styles.authHero}>
         <View style={styles.logoBubble}>
-          <Ionicons name="sparkles" size={34} color={palette.primary} />
+          <Ionicons name="sparkles" size={34} color={colors.primary} />
         </View>
         <Text style={styles.authTitle}>Join AURA Guide</Text>
         <Text style={styles.authSubtitle}>Create your account and set up your growth plan.</Text>
@@ -88,47 +145,49 @@ export function SignUpScreen({
         <InputField
           label="Email"
           placeholder="you@university.edu"
-          value={email}
+          value={draft.email}
           onChangeText={(value) => {
-            setEmail(value);
-            setEmailChecked(false);
+            patch({ email: value, emailChecked: false });
             if (error) setError("");
           }}
           keyboardType="email-address"
-          icon={<Feather name="mail" size={18} color={palette.muted} />}
+          icon={<Feather name="mail" size={18} color={colors.muted} />}
         />
 
         <InputField
           label="Password"
           placeholder="Create a strong password"
-          value={password}
+          value={draft.password}
           onChangeText={async (value) => {
-            if (!emailChecked && !checkingEmail) {
+            if (!draft.emailChecked && !checkingEmail) {
               await validateEmail();
             }
-            setPassword(value);
+            patch({ password: value });
           }}
-          secureTextEntry={!showPassword}
-          icon={<Feather name="lock" size={18} color={palette.muted} />}
+          secureTextEntry={!draft.showPassword}
+          icon={<Feather name="lock" size={18} color={colors.muted} />}
         />
 
         <InputField
           label="Confirm Password"
           placeholder="Re-enter your password"
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          secureTextEntry={!showPassword}
-          icon={<Feather name="lock" size={18} color={palette.muted} />}
+          value={draft.confirmPassword}
+          onChangeText={(value) => patch({ confirmPassword: value })}
+          secureTextEntry={!draft.showPassword}
+          icon={<Feather name="lock" size={18} color={colors.muted} />}
         />
 
         <View style={styles.inlineRow}>
-          <TextLink label={showPassword ? "Hide passwords" : "Show passwords"} onPress={() => setShowPassword((value) => !value)} />
+          <TextLink
+            label={draft.showPassword ? "Hide passwords" : "Show passwords"}
+            onPress={() => patch({ showPassword: !draft.showPassword })}
+          />
           <TextLink label="View terms" onPress={onOpenTerms} />
         </View>
 
-        <Pressable onPress={() => setAcceptTerms((value) => !value)} style={styles.checkboxRow}>
-          <View style={[styles.checkbox, acceptTerms ? styles.checkboxChecked : undefined]}>
-            {acceptTerms ? <Ionicons name="checkmark" size={14} color={palette.surface} /> : null}
+        <Pressable onPress={() => patch({ acceptTerms: !draft.acceptTerms })} style={styles.checkboxRow}>
+          <View style={[styles.checkbox, draft.acceptTerms ? styles.checkboxChecked : undefined]}>
+            {draft.acceptTerms ? <Ionicons name="checkmark" size={14} color="#FFFFFF" /> : null}
           </View>
           <Text style={styles.checkboxText}>
             I accept the Terms and Conditions (Last updated: May 2026) and Privacy Policy
@@ -150,87 +209,3 @@ export function SignUpScreen({
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  authScroll: {
-    paddingHorizontal: 20,
-    paddingVertical: 28,
-    justifyContent: "center",
-    minHeight: "100%",
-    gap: 18,
-  },
-  authHero: {
-    alignItems: "center",
-    gap: 10,
-  },
-  logoBubble: {
-    width: 74,
-    height: 74,
-    borderRadius: 24,
-    backgroundColor: "rgba(255,255,255,0.8)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  authTitle: {
-    fontSize: 30,
-    fontWeight: "800",
-    color: palette.text,
-    textAlign: "center",
-  },
-  authSubtitle: {
-    maxWidth: 300,
-    textAlign: "center",
-    color: palette.muted,
-    lineHeight: 22,
-  },
-  authCard: {
-    gap: 14,
-  },
-  authFooter: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 6,
-    alignItems: "center",
-  },
-  authFooterText: {
-    color: palette.muted,
-  },
-  inlineRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-  },
-  checkboxRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: palette.border,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: palette.surface,
-  },
-  checkboxChecked: {
-    backgroundColor: palette.primary,
-    borderColor: palette.primary,
-  },
-  checkboxText: {
-    flex: 1,
-    color: palette.muted,
-    lineHeight: 20,
-  },
-  errorText: {
-    color: palette.danger,
-    fontWeight: "600",
-  },
-  actionsRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-});

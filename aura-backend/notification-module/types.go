@@ -8,10 +8,15 @@ type Response struct {
 }
 
 type Item struct {
-	ID      int    `json:"id"`
-	Title   string `json:"title"`
-	Message string `json:"message"`
-	Type    string `json:"type"`
-	Time    string `json:"time"`
-	Read    bool   `json:"read"`
+	ID        int       `json:"id"`
+	Type      string    `json:"type"`
+	Title     string    `json:"title"`
+	Message   string    `json:"message"`
+	Time      string    `json:"time"`
+	Read      bool      `json:"read"`
+	SentAt    time.Time `json:"-"`
+}
+
+type ListResponse struct {
+	Notifications []Item `json:"notifications"`
 }

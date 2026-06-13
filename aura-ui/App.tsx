@@ -5,10 +5,11 @@ import { StyleSheet, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 
+import { setTheme } from "./src/theme";
 import { ThemeProvider } from "./src/theme/ThemeContext";
 import { Route, TabRoute, UserProfile } from "./src/types";
 import { initialProfile, tabRoutes } from "./src/constants";
-import { NotificationItem } from "./src/constants/appData";
+import { NotificationItem } from "./src/scenes/Notifications";
 
 // Components
 import { BottomTabs } from "./src/components/BottomTabs";
@@ -16,7 +17,7 @@ import { BottomTabs } from "./src/components/BottomTabs";
 // Scenes
 import { SplashScreen } from "./src/scenes/Splash";
 import { SignInScreen } from "./src/scenes/SignIn";
-import { SignUpScreen } from "./src/scenes/SignUp";
+import { SignUpScreen, SignUpDraft } from "./src/scenes/SignUp";
 import { ResetPasswordScreen } from "./src/scenes/ResetPassword";
 import { OnboardingScreen } from "./src/scenes/Onboarding";
 import { DashboardScreen } from "./src/scenes/Dashboard";
@@ -39,6 +40,15 @@ const goalIdToLabel: Record<number, string> = {
   4: "DevOps Engineer",
 };
 
+const emptySignUpDraft: SignUpDraft = {
+  email: "",
+  password: "",
+  confirmPassword: "",
+  acceptTerms: false,
+  showPassword: false,
+  emailChecked: false,
+};
+
 export default function App() {
   const [route, setRoute] = useState<Route>("splash");
   const [tab, setTab] = useState<TabRoute>("dashboard");
@@ -50,6 +60,7 @@ export default function App() {
     darkMode: false,
     language: "English (US)",
   });
+  const [signupDraft, setSignupDraft] = useState<SignUpDraft>(emptySignUpDraft);
   const [termsBackRoute, setTermsBackRoute] = useState<Route>("signup");
   const [pendingAgentTask, setPendingAgentTask] = useState<PendingTaskAnswerPayload | undefined>(undefined);
   const [isReturningUser, setIsReturningUser] = useState(true);
@@ -58,30 +69,15 @@ export default function App() {
     setPendingAgentTask(undefined);
   }, []);
 
-  useEffect(() => {
-    AsyncStorage.getItem("aura_dark_mode").then((v) => {
-      if (v === "1") {
-        setSettings((s) => ({ ...s, darkMode: true }));
-      }
-    });
-  }, []);
-
-  useEffect(() => {
-    AsyncStorage.setItem("aura_dark_mode", settings.darkMode ? "1" : "0");
-  }, [settings.darkMode]);
-
   const loadNotifications = useCallback(async () => {
-    if (!settings.notifications) {
-      setNotifications([]);
-      return;
-    }
     try {
-      const items = await api.listNotifications();
-      setNotifications(Array.isArray(items) ? items : []);
+      const data = await api.getNotifications();
+      const list = Array.isArray(data?.notifications) ? data.notifications : [];
+      setNotifications(list);
     } catch {
       setNotifications([]);
     }
-  }, [settings.notifications]);
+  }, []);
 
   const fetchProfile = async () => {
     try {
@@ -114,7 +110,6 @@ export default function App() {
         recommendation: profileData.recommendation ?? "",
         joinedDate: initialProfile.joinedDate,
       });
-      void loadNotifications();
       return true;
     } catch (err) {
       return false;
@@ -128,6 +123,7 @@ export default function App() {
       const ok = await fetchProfile();
       if (ok) {
         await api.recordCheckIn().catch(() => {});
+        await loadNotifications();
         setRoute("dashboard");
       } else {
         setRoute("signin");
@@ -142,6 +138,17 @@ export default function App() {
     AsyncStorage.getItem("aura_returning_user").then((v) => setIsReturningUser(v === "1"));
   }, []);
 
+  useEffect(() => {
+    AsyncStorage.getItem("aura_dark_mode").then((v) => {
+      if (v === "1") setSettings((s) => ({ ...s, darkMode: true }));
+    });
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.setItem("aura_dark_mode", settings.darkMode ? "1" : "0");
+    setTheme(settings.darkMode);
+  }, [settings.darkMode]);
+
   const handleSignIn = async (email?: string, password?: string) => {
     const normalizedEmail = (email ?? "").trim().toLowerCase();
     const passwordValue = password ?? "";
@@ -151,11 +158,12 @@ export default function App() {
     }
     try {
       await api.login({ email: normalizedEmail, password: passwordValue });
+      await api.recordCheckIn().catch(() => {});
       const ok = await fetchProfile();
       if (ok) {
-        await api.recordCheckIn().catch(() => {});
         await AsyncStorage.setItem("aura_returning_user", "1");
         setIsReturningUser(true);
+        await loadNotifications();
         setRoute("dashboard");
       }
     } catch (err) {
@@ -166,6 +174,7 @@ export default function App() {
   const handleSignUp = (email: string, password?: string) => {
     setUser((prev) => ({ ...prev, email }));
     if (password) setTempPassword(password);
+    setSignupDraft(emptySignUpDraft);
     setRoute("onboarding");
   };
 
@@ -175,7 +184,6 @@ export default function App() {
       await api.login({ email: profile.email, password: profile.password });
       const ok = await fetchProfile();
       if (ok) {
-        await api.recordCheckIn().catch(() => {});
         setIsReturningUser(false);
         setRoute("dashboard");
       }
@@ -220,11 +228,16 @@ export default function App() {
       case "signup":
         return (
           <SignUpScreen
+            draft={signupDraft}
+            onDraftChange={setSignupDraft}
             onOpenTerms={() => {
               setTermsBackRoute("signup");
               setRoute("terms");
             }}
-            onOpenSignIn={() => setRoute("signin")}
+            onOpenSignIn={() => {
+              setSignupDraft(emptySignUpDraft);
+              setRoute("signin");
+            }}
             onContinue={handleSignUp}
           />
         );
@@ -298,7 +311,11 @@ export default function App() {
             onBack={() => setRoute("dashboard")}
             onRefresh={loadNotifications}
             onMarkAllRead={async () => {
-              await api.markAllNotificationsRead().catch(() => {});
+              try {
+                await api.markAllNotificationsRead();
+              } catch {
+                /* ignore */
+              }
               setNotifications((n) => n.map((item) => ({ ...item, read: true })));
             }}
           />
@@ -306,7 +323,7 @@ export default function App() {
       case "calendar":
         return <CalendarScreen onBack={() => setRoute("dashboard")} />;
       case "careerTrack":
-        return <CareerTrackScreen onBack={() => setRoute("dashboard")} user={user} />;
+        return <CareerTrackScreen onBack={() => setRoute("dashboard")} />;
       case "terms":
         return <TermsScreen onBack={() => setRoute(termsBackRoute)} />;
       default:
