@@ -578,9 +578,8 @@ export function AICoachScreen({
       const summary = prettifyBulletLines(summaryRaw);
       setCvLocalSummary(summary);
       pushAura(`Here's your CV feedback.\n\n${summary}\n\n_Saved under Profile › CV & analysis._`, "CV feedback");
-      showAlert("CV feedback ready", "Strengths and growth areas are saved. View them anytime on Profile.");
     } catch (e) {
-      showAlert("Upload failed", (e as Error).message);
+      pushAura(`CV upload failed: ${(e as Error).message}`, "Upload failed");
     } finally {
       setIsUploading(false);
     }
