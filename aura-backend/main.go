@@ -111,6 +111,7 @@ func main() {
 		r.Get("/aura-life-coach/BehavioralInterviewFeedback", auraLifeCoachApi.GetBehavioralInterviewFeedbackHandler)
 		r.Post("/aura-life-coach/cv/upload", auraLifeCoachApi.UploadCVHandler)
 		r.Post("/aura-life-coach/cv/upload-pdf", auraLifeCoachApi.UploadCVPDFHandler)
+		r.Post("/aura-life-coach/cv/extract-pdf", auraLifeCoachApi.UploadCVPDFExtractHandler)
 		r.Post("/aura-life-coach/cv/analyze", auraLifeCoachApi.AnalyzeCVHandler)
 		r.Get("/aura-life-coach/cv/feedback", auraLifeCoachApi.GetCVFeedbackHandler)
 		r.Get("/aura-life-coach/cv/list", auraLifeCoachApi.ListCVsHandler)

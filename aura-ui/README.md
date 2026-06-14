@@ -62,4 +62,4 @@ npm run typecheck
 
 ## 8. Notes
 
-- The Expo app uses `App.tsx` and the `src/` folder. All screens load live data from the Go API and Python AI agent — there is no mock data layer.
+- The Expo app uses `App.tsx` and the `src/` folder. All screens load live data from the Go API and Python AI agent - there is no mock data layer.

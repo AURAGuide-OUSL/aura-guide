@@ -1,4 +1,4 @@
-/** Terms shown from Sign-up (Terms link) and Settings — keep in sync manually. */
+/** Terms shown from Sign-up (Terms link) and Settings - keep in sync manually. */
 
 export const termsUpdatedSubtitle = "Last updated: May 2026";
 

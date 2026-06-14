@@ -49,7 +49,7 @@ function buildTrackSteps(skills: SkillRow[]): TrackStep[] {
   return ordered.map((skill) => ({
     id: skill.skill_id,
     title: skill.skill_name,
-    period: `${skill.category_name || "Skill"} · ${skill.current_level || "—"} → ${skill.required_level || "Target"}`,
+    period: `${skill.category_name || "Skill"} · ${skill.current_level || "-"} → ${skill.required_level || "Target"}`,
     status: skillStatus(skill),
     progress: Math.min(100, Math.max(0, skill.current_pct)),
   }));

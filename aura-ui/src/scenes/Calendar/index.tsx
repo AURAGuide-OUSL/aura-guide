@@ -109,7 +109,7 @@ export function CalendarScreen({ onBack }: { onBack: () => void }) {
       const end = new Date(start);
       end.setDate(end.getDate() + 6);
       const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-      return `${start.toLocaleDateString("en-US", opts)} — ${end.toLocaleDateString("en-US", {
+      return `${start.toLocaleDateString("en-US", opts)} - ${end.toLocaleDateString("en-US", {
         ...opts,
         year: "numeric",
       })}`;

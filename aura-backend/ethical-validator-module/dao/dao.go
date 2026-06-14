@@ -13,7 +13,7 @@ var (
 	validations  = map[string]ethicalvalidator.ValidationStatus{}
 )
 
-// Whole-word / phrase patterns only — avoids false positives like "lying" in "applying".
+// Whole-word / phrase patterns only - avoids false positives like "lying" in "applying".
 var ethicalPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)\blies\b`),
 	regexp.MustCompile(`(?i)\blie\b`),

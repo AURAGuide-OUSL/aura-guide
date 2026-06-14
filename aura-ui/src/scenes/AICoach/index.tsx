@@ -132,14 +132,14 @@ export function AICoachScreen({
     return null;
   }, [phase, pendingTaskAnswer]);
 
-  /** Prompt strip only on home — active flows get full chat height for questions. */
+  /** Prompt strip only on home - active flows get full chat height for questions. */
   const showPromptBand = phase.kind === "home";
   const promptBandMaxHeight = useMemo(() => {
     const cap = height * 0.28;
     return Math.min(Math.round(cap), 260);
   }, [height]);
 
-  /** Feedback received — show sticky actions (not while waiting for first answer). */
+  /** Feedback received - show sticky actions (not while waiting for first answer). */
   const showInterviewNextBtn = useMemo(
     () => phase.kind === "interview" && !phase.awaitingFeedback && !isTyping,
     [phase, isTyping],
@@ -675,7 +675,7 @@ export function AICoachScreen({
       const lower = name.toLowerCase();
       const mime = (asset.mimeType || "").toLowerCase();
       const pdfMsg =
-        "Only PDF files can be uploaded as your CV. Word, text, and other document types are not accepted — export your CV as PDF and try again.";
+        "Only PDF files can be uploaded as your CV. Word, text, and other document types are not accepted - export your CV as PDF and try again.";
       const blockedExt = [".doc", ".docx", ".txt", ".rtf", ".odt", ".pages", ".md"];
       if (blockedExt.some((ext) => lower.endsWith(ext))) {
         showAlert("PDF only", pdfMsg);
@@ -709,11 +709,15 @@ export function AICoachScreen({
       }
       setFileName(name);
       setIsUploading(true);
-      const data = await api.uploadCVPdf({
-        uri: asset.uri,
-        name,
-        mimeType: asset.mimeType || "application/pdf",
-      });
+      const data = await api.uploadCVPdf(
+        {
+          uri: asset.uri,
+          name,
+          mimeType: asset.mimeType || "application/pdf",
+        },
+        chatSessionId,
+      );
+      if (data.session_id != null) setChatSessionId(data.session_id);
       const bullets = (arr: unknown[]) =>
         Array.isArray(arr) ? arr.map((s) => `• ${prettifyCvLine(s)}`).join("\n") : "";
       const prettifyBulletLines = (text: string) =>
@@ -726,12 +730,25 @@ export function AICoachScreen({
           .join("\n");
       const summaryRaw =
         data.chat_summary ||
-        ["Strengths", bullets(data.strengths as unknown[]), "", "Growth areas", bullets(data.weaknesses as unknown[])].join("\n");
+        [
+          "Strengths",
+          bullets(data.strengths as unknown[]),
+          "",
+          "Growth areas",
+          bullets(data.weaknesses as unknown[]),
+          "",
+          "Suggested improvements",
+          bullets(data.improvements as unknown[]),
+        ].join("\n");
       const summary = prettifyBulletLines(summaryRaw);
       setCvLocalSummary(summary);
-      pushAura(`Here's your CV feedback.\n\n${summary}\n\n_Saved under Profile › CV & analysis._`, "CV feedback");
+      pushAura(
+        `Here's your resume feedback.\n\n${summary}\n\n_Saved under Profile › CV & analysis._`,
+        "Resume feedback",
+      );
     } catch (e) {
-      pushAura(`CV upload failed: ${(e as Error).message}`, "Upload failed");
+      const msg = (e as Error).message || "Upload failed";
+      pushAura(`CV upload failed: ${msg.length > 280 ? `${msg.slice(0, 280)}…` : msg}`, "Upload failed");
     } finally {
       setIsUploading(false);
     }
@@ -828,7 +845,7 @@ export function AICoachScreen({
                   {isUploading ? "Uploading PDF…" : "Upload CV (PDF)"}
                 </Text>
                 <Text style={styles.promptRowMeta} numberOfLines={2}>
-                  {fileName ? fileName : "Extract text on the server, then AI feedback in chat & profile"}
+                  {fileName ? fileName : "Upload a PDF version of your resume and get resume feedback."}
                 </Text>
               </View>
               <Ionicons name="document-attach" size={18} color={palette.primary} />

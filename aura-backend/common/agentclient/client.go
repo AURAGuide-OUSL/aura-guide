@@ -16,7 +16,7 @@ import (
 func BaseURL() string {
 	u := strings.TrimSpace(os.Getenv("AI_AGENT_URL"))
 	if u == "" {
-		return "http://127.0.0.1:8000"
+		return "http://127.0.0.1:8001"
 	}
 	return strings.TrimRight(u, "/")
 }
@@ -56,7 +56,8 @@ func PostCVAnalyze(ctx context.Context, jwt string, reqBody CVAnalyzeRequest) (*
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("agent %s: %s", resp.Status, string(bytes.TrimSpace(raw)))
+		msg := sanitizeAgentError(string(bytes.TrimSpace(raw)))
+		return nil, fmt.Errorf("agent %s: %s", resp.Status, msg)
 	}
 
 	var out CVAnalyzeResponse
@@ -64,4 +65,19 @@ func PostCVAnalyze(ctx context.Context, jwt string, reqBody CVAnalyzeRequest) (*
 		return nil, fmt.Errorf("decode agent response: %w", err)
 	}
 	return &out, nil
+}
+
+func sanitizeAgentError(body string) string {
+	trim := strings.TrimSpace(body)
+	if trim == "" {
+		return "empty response from AI agent"
+	}
+	lower := strings.ToLower(trim)
+	if strings.HasPrefix(lower, "<!doctype") || strings.HasPrefix(lower, "<html") {
+		return "AI agent URL misconfigured (received an HTML page instead of JSON). Set AI_AGENT_URL to the FastAPI service (e.g. http://127.0.0.1:8001)."
+	}
+	if len(trim) > 400 {
+		return trim[:400] + "…"
+	}
+	return trim
 }

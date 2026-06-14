@@ -5,6 +5,24 @@ import { CONFIG } from "../config";
 
 const API_BASE_URL = CONFIG.API_BASE_URL;
 
+async function readResponseError(response: Response, fallback: string): Promise<string> {
+  const raw = await response.text();
+  const trim = raw.trim();
+  if (!trim) return fallback;
+  if (trim.startsWith("<!") || trim.toLowerCase().includes("<html")) {
+    return `${fallback} Check that the service URL in config is correct and the server is running.`;
+  }
+  try {
+    const j = JSON.parse(trim) as { error?: string; detail?: string | { msg?: string }[] };
+    if (j?.error) return j.error;
+    if (typeof j?.detail === "string") return j.detail;
+    if (Array.isArray(j?.detail) && j.detail[0]?.msg) return j.detail[0].msg;
+  } catch {
+    /* plain text */
+  }
+  return trim.length > 320 ? `${trim.slice(0, 320)}…` : trim;
+}
+
 async function authHeaders(contentType = true) {
   const token = await AsyncStorage.getItem("auth_token");
   if (!token) throw new Error("No auth token found");
@@ -423,7 +441,7 @@ export const api = {
     }>;
   },
 
-  async uploadCVPdf(asset: { uri: string; name: string; mimeType?: string }) {
+  async extractCVPdf(asset: { uri: string; name: string; mimeType?: string }) {
     const token = await AsyncStorage.getItem("auth_token");
     if (!token) throw new Error("No auth token found");
     const form = new FormData();
@@ -452,7 +470,7 @@ export const api = {
         } as any,
       );
     }
-    const response = await fetch(`${API_BASE_URL}/aura-life-coach/cv/upload-pdf`, {
+    const response = await fetch(`${API_BASE_URL}/aura-life-coach/cv/extract-pdf`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -462,21 +480,40 @@ export const api = {
       body: form,
     });
     if (!response.ok) {
-      let msg = await response.text();
-      try {
-        const j = JSON.parse(msg);
-        if (j?.error) msg = j.error;
-      } catch {
-        /* plain text */
-      }
-      throw new Error(msg || "Upload failed");
+      throw new Error(await readResponseError(response, "Could not read PDF"));
+    }
+    return response.json() as Promise<{ cv_text: string; file_name: string }>;
+  },
+
+  async agentCvAnalyze(cvText: string, fileName: string, sessionId?: number | null) {
+    const response = await fetch(`${CONFIG.AI_AGENT_BASE_URL}/agent/cv-analyze`, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify({
+        cv_text: cvText,
+        file_name: fileName,
+        ...(sessionId != null ? { session_id: sessionId } : {}),
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(await readResponseError(response, "CV analysis failed"));
     }
     return response.json() as Promise<{
       strengths: string[];
       weaknesses: string[];
       improvements: string[];
       chat_summary?: string;
+      session_id?: number;
     }>;
+  },
+
+  async uploadCVPdf(asset: { uri: string; name: string; mimeType?: string }, sessionId?: number | null) {
+    const extracted = await api.extractCVPdf(asset);
+    const text = (extracted.cv_text || "").trim();
+    if (!text) {
+      throw new Error("Could not extract text from this PDF. Try a text-based PDF export.");
+    }
+    return api.agentCvAnalyze(text, extracted.file_name || asset.name || "cv.pdf", sessionId);
   },
 
   async agentInterviewQuestion(

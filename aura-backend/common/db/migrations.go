@@ -135,7 +135,7 @@ JOIN skills s ON lower(trim(s.name)) = lower(trim($2))
 WHERE lower(trim(g.name)) = lower(trim($1))
 ON CONFLICT DO NOTHING`, goalName, skillName, scoreID)
 			if err != nil {
-				// Fallback when ON CONFLICT target missing — upsert manually
+				// Fallback when ON CONFLICT target missing - upsert manually
 				_, err2 := Pool.Exec(ctx, `
 INSERT INTO goal_skill_matrix (goal_id, skill_id, score_id)
 SELECT g.id, s.id, $3

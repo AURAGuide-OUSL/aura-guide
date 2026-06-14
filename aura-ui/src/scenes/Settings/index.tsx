@@ -80,7 +80,7 @@ export function SettingsScreen({
                 <Ionicons name="document-text-outline" size={20} color={colors.primary} />
               </View>
               <View>
-                <Text style={styles.rowText}>Terms and Conditions — updated May 2026</Text>
+                <Text style={styles.rowText}>Terms and Conditions - updated May 2026</Text>
                 <Text style={styles.rowMeta}>Full text opens in Terms</Text>
               </View>
             </View>
