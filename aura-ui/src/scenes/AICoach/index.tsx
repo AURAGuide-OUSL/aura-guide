@@ -139,6 +139,16 @@ export function AICoachScreen({
     return Math.min(Math.round(cap), 260);
   }, [height]);
 
+  /** Feedback received — show sticky actions (not while waiting for first answer). */
+  const showInterviewNextBtn = useMemo(
+    () => phase.kind === "interview" && !phase.awaitingFeedback && !isTyping,
+    [phase, isTyping],
+  );
+  const showReflectionNextBtn = useMemo(
+    () => phase.kind === "reflection" && !phase.awaitingFeedback && !isTyping,
+    [phase, isTyping],
+  );
+
   const pushAura = useCallback((content: string, category?: string) => {
     setMessages((c) => [
       ...c,
@@ -265,7 +275,7 @@ export function AICoachScreen({
 
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });
-  }, [messages, isTyping, interviewShowNext, reflectionShowNext, showComposer, activeTaskAnswer]);
+  }, [messages, isTyping, showInterviewNextBtn, showReflectionNextBtn, showComposer, activeTaskAnswer]);
 
   const resetToHome = useCallback(() => {
     setPhase({ kind: "home" });
@@ -500,8 +510,11 @@ export function AICoachScreen({
           session_id: chatSessionId ?? undefined,
         });
         setChatSessionId(res.session_id);
-        pushAura(formatCoachFeedback(res.feedback_message || "Thanks - review your skill matrix on Goals."), "Feedback");
-        if (res.ethical_flag) {
+        pushAura(
+          formatCoachFeedback(res.feedback_message || "Thanks - review your skill matrix on Goals."),
+          res.dont_know ? "Learning" : "Feedback",
+        );
+        if (res.ethical_flag || res.dont_know) {
           setShowComposer(true);
         } else {
           setPhase({ kind: "home" });
@@ -527,15 +540,18 @@ export function AICoachScreen({
           chatSessionId,
         );
         setChatSessionId(ev.session_id);
-        pushAura(formatCoachFeedback(ev.feedback), ev.ethical_flag ? "Ethical review" : "Feedback");
-        if (ev.ethical_flag) {
-          setInterviewShowNext(false);
+        pushAura(
+          formatCoachFeedback(ev.feedback),
+          ev.ethical_flag ? "Ethical review" : ev.dont_know ? "Learning" : "Feedback",
+        );
+        if (ev.ethical_flag || ev.dont_know) {
+          setInterviewShowNext(!!ev.dont_know);
           setShowComposer(true);
           setPhase({
             kind: "interview",
             questionNumber: phase.questionNumber,
             questionText: phase.questionText,
-            awaitingFeedback: true,
+            awaitingFeedback: !!ev.ethical_flag,
           });
         } else {
           setInterviewShowNext(true);
@@ -567,8 +583,11 @@ export function AICoachScreen({
           chatSessionId,
         );
         setChatSessionId(ev.session_id);
-        pushAura(formatCoachFeedback(ev.feedback), ev.ethical_flag ? "Ethical review" : "Feedback");
-        if (ev.ethical_flag) {
+        pushAura(
+          formatCoachFeedback(ev.feedback),
+          ev.ethical_flag ? "Ethical review" : ev.dont_know ? "Learning" : "Feedback",
+        );
+        if (ev.ethical_flag || ev.dont_know) {
           setReflectionShowNext(false);
           setShowComposer(true);
           setPhase({
@@ -849,7 +868,11 @@ export function AICoachScreen({
         <ScrollView
           ref={scrollRef}
           style={styles.chatScroll}
-          contentContainerStyle={[styles.chatBody, { paddingHorizontal: screenPadding }]}
+          contentContainerStyle={[
+            styles.chatBody,
+            { paddingHorizontal: screenPadding },
+            (showInterviewNextBtn || showReflectionNextBtn) && styles.chatBodyWithActionBar,
+          ]}
           keyboardShouldPersistTaps="handled"
           nestedScrollEnabled
         >
@@ -903,20 +926,6 @@ export function AICoachScreen({
           );
         })}
 
-        {interviewShowNext && phase.kind === "interview" ? (
-          <Pressable onPress={nextInterviewQuestion} style={styles.nextQBtn}>
-            <Text style={styles.nextQBtnText}>Next question</Text>
-            <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
-          </Pressable>
-        ) : null}
-
-        {reflectionShowNext && phase.kind === "reflection" ? (
-          <Pressable onPress={nextReflectionQuestion} style={styles.nextQBtnSecondary}>
-            <Text style={styles.nextQBtnSecondaryText}>Another reflection</Text>
-            <Ionicons name="leaf-outline" size={18} color={palette.primary} />
-          </Pressable>
-        ) : null}
-
         {isTyping ? (
           <View style={styles.messageRow}>
             <View style={styles.avatarAura}>
@@ -929,6 +938,59 @@ export function AICoachScreen({
         ) : null}
       </ScrollView>
       </View>
+
+      {showInterviewNextBtn ? (
+        <View
+          style={[
+            styles.flowActionBar,
+            { backgroundColor: colors.background, borderTopColor: colors.border },
+          ]}
+        >
+          <Pressable
+            onPress={() => void nextInterviewQuestion()}
+            style={({ pressed }) => [
+              styles.flowActionBtn,
+              { backgroundColor: colors.primary },
+              pressed && { opacity: 0.9 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Next interview question"
+          >
+            <Ionicons name="arrow-forward-circle" size={22} color="#FFFFFF" />
+            <Text style={styles.flowActionBtnText}>Next question</Text>
+          </Pressable>
+          {showComposer ? (
+            <Text style={[styles.flowActionHint, { color: colors.muted }]}>
+              Or revise your answer in the box below
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
+      {showReflectionNextBtn ? (
+        <View
+          style={[
+            styles.flowActionBar,
+            { backgroundColor: colors.background, borderTopColor: colors.border },
+          ]}
+        >
+          <Pressable
+            onPress={() => void nextReflectionQuestion()}
+            style={({ pressed }) => [
+              styles.flowActionBtnSecondary,
+              { backgroundColor: colors.surface, borderColor: colors.primary },
+              pressed && { opacity: 0.9 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Another reflection question"
+          >
+            <Ionicons name="leaf-outline" size={20} color={colors.primary} />
+            <Text style={[styles.flowActionBtnTextSecondary, { color: colors.primary }]}>
+              Another reflection
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {showComposer ? (
         <View style={[styles.footer, { paddingHorizontal: screenPadding, backgroundColor: colors.background, borderTopColor: colors.border }]}>
@@ -1218,6 +1280,53 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     gap: 14,
     flexGrow: 1,
+  },
+  chatBodyWithActionBar: {
+    paddingBottom: 8,
+  },
+  flowActionBar: {
+    flexShrink: 0,
+    paddingHorizontal: screenPadding,
+    paddingTop: 10,
+    paddingBottom: 10,
+    borderTopWidth: 1,
+    gap: 6,
+  },
+  flowActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+    backgroundColor: palette.primary,
+  },
+  flowActionBtnSecondary: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+    backgroundColor: palette.surface,
+    borderWidth: 2,
+    borderColor: palette.primary,
+  },
+  flowActionBtnText: {
+    color: "#FFFFFF",
+    fontWeight: "800",
+    fontSize: 16,
+  },
+  flowActionBtnTextSecondary: {
+    fontWeight: "800",
+    fontSize: 16,
+  },
+  flowActionHint: {
+    fontSize: 12,
+    fontWeight: "600",
+    textAlign: "center",
   },
   cvSummaryCard: {
     padding: 14,
