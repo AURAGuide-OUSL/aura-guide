@@ -13,60 +13,35 @@ ETHICAL_FEEDBACK = (
     "and genuine learning."
 )
 
-# Substrings (aligned with Go ethical-validator-module) plus common variants.
-ETHICAL_FLAG_TERMS = (
-    "lie",
-    "lied",
-    "lying",
-    "cheat",
-    "cheating",
-    "cheated",
-    "plagiar",
-    "discriminat",
-    "harass",
-    "bypass policy",
-    "bypass security",
-    "dishonest",
-    "dishonesty",
-    "steal",
-    "stolen",
-    "theft",
-    "fraud",
-    "misrepresent",
-    "deceive",
-    "deception",
-    "cover up",
-    "cover-up",
-    "ignore debugging",
-    "skip maintenance",
-    "skipping maintenance",
-    "compromise the logging",
-    "compromise logging",
-    "skip proper data",
-    "skip proper",
-    "skip records",
-    "skip documentation",
-    "skip logging",
-)
-
+# Whole-word / phrase patterns only — avoids false positives like "lying" in "applying".
 ETHICAL_FLAG_PATTERNS = (
     re.compile(r"\blies\b", re.I),
     re.compile(r"\blie\b", re.I),
     re.compile(r"\blied\b", re.I),
     re.compile(r"\blying\b", re.I),
     re.compile(r"\bcheat(?:s|d|ing)?\b", re.I),
-    re.compile(r"plagiar", re.I),
-    re.compile(r"discriminat", re.I),
-    re.compile(r"\bharass", re.I),
-    re.compile(r"bypass\s+(?:policy|security|rules)", re.I),
-    re.compile(r"\bdishonest", re.I),
+    re.compile(r"\bplagiar(?:y|ize|ized|izing|ise|ised|ising)\b", re.I),
+    re.compile(r"\bdiscriminat(?:e|es|ed|ing|ion|ory)\b", re.I),
+    re.compile(r"\bharass(?:es|ed|ing|ment)?\b", re.I),
+    re.compile(r"\bbypass\s+(?:policy|security|rules)\b", re.I),
+    re.compile(r"\bdishonest(?:y)?\b", re.I),
     re.compile(r"\bsteal(?:ing|s)?\b", re.I),
     re.compile(r"\bstolen\b", re.I),
     re.compile(r"\btheft\b", re.I),
-    re.compile(r"\bfraud", re.I),
-    re.compile(r"compromis(?:e|ing)\s+(?:the\s+)?(?:logging|records|audit|integrity)", re.I),
-    re.compile(r"skip(?:ping)?\s+(?:maintenance|proper|records|documentation|logging)", re.I),
-    re.compile(r"ignore\s+debugging", re.I),
+    re.compile(r"\bfraud(?:ulent)?\b", re.I),
+    re.compile(r"\bmisrepresent(?:ed|ing|ation)?\b", re.I),
+    re.compile(r"\bdeceiv(?:e|es|ed|ing|ing)?\b", re.I),
+    re.compile(r"\bdeception\b", re.I),
+    re.compile(r"\bcover[- ]?up\b", re.I),
+    re.compile(
+        r"\bcompromis(?:e|es|ed|ing)\s+(?:the\s+)?(?:logging|records|audit|integrity)\b",
+        re.I,
+    ),
+    re.compile(
+        r"\bskip(?:ping)?\s+(?:maintenance|proper|records|documentation|logging)\b",
+        re.I,
+    ),
+    re.compile(r"\bignore\s+debugging\b", re.I),
 )
 
 
@@ -80,11 +55,6 @@ def check_answer_ethics(answer: str) -> EthicalCheckResult:
     text = (answer or "").strip()
     if not text:
         return EthicalCheckResult(True, "")
-
-    lower = text.lower()
-    for term in ETHICAL_FLAG_TERMS:
-        if term in lower:
-            return EthicalCheckResult(False, ETHICAL_FEEDBACK)
 
     for pattern in ETHICAL_FLAG_PATTERNS:
         if pattern.search(text):
