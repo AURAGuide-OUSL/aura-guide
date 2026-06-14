@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -58,6 +59,27 @@ function fmtTime(d: Date) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function fmtSessionDate(value: string | null | undefined) {
+  if (!value) return "Unknown date";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "Unknown date";
+  return d.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+type ChatSessionSummary = {
+  id: number;
+  topic: string;
+  started_at: string | null;
+  message_count: number;
+  preview: string;
+};
+
 export type PendingTaskAnswerPayload = {
   userCommonTaskId: number;
   taskText: string;
@@ -92,6 +114,9 @@ export function AICoachScreen({
   const [isUploading, setIsUploading] = useState(false);
   const [fileName, setFileName] = useState("");
   const [inputHeight, setInputHeight] = useState(COMPOSER_MIN_HEIGHT);
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historySessions, setHistorySessions] = useState<ChatSessionSummary[]>([]);
   const scrollRef = useRef<ScrollView>(null);
   const { colors } = useTheme();
 
@@ -280,6 +305,57 @@ export function AICoachScreen({
       setIsTyping(false);
     }
   }, [resetToHome]);
+
+  const openChatHistory = useCallback(async () => {
+    setShowHistory(true);
+    setHistoryLoading(true);
+    try {
+      const data = await api.getAgentChatSessions();
+      setHistorySessions(Array.isArray(data.sessions) ? data.sessions : []);
+    } catch (e) {
+      setHistorySessions([]);
+      showAlert("Could not load chat history", (e as Error).message);
+      setShowHistory(false);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  const loadChatSession = useCallback(
+    async (sessionId: number) => {
+      setHistoryLoading(true);
+      try {
+        const hist = await api.getAgentChatHistory(sessionId);
+        const loaded: Message[] = (hist.messages ?? []).map((m, i) => ({
+          id: typeof m.id === "number" ? m.id : 3000 + i,
+          type: m.role === "user" ? ("user" as const) : ("aura" as const),
+          content: m.content,
+          timestamp: fmtTime(new Date()),
+        }));
+        setChatSessionId(hist.session_id ?? sessionId);
+        setMessages(
+          loaded.length > 0
+            ? loaded
+            : [
+                {
+                  id: Date.now(),
+                  type: "aura",
+                  content: "This session has no messages yet.",
+                  timestamp: fmtTime(new Date()),
+                  category: "History",
+                },
+              ],
+        );
+        resetToHome();
+        setShowHistory(false);
+      } catch (e) {
+        showAlert("Could not open session", (e as Error).message);
+      } finally {
+        setHistoryLoading(false);
+      }
+    },
+    [resetToHome],
+  );
 
   const runAssignTask = async () => {
     pushUser("Assign me a new task");
@@ -665,8 +741,24 @@ export function AICoachScreen({
           </View>
           <View style={styles.topBarActions}>
             <Pressable
+              onPress={() => void openChatHistory()}
+              style={({ pressed }) => [
+                styles.headerIconBtn,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+                pressed && styles.headerIconBtnPressed,
+              ]}
+              accessibilityLabel="View previous chats"
+              accessibilityRole="button"
+            >
+              <Ionicons name="time-outline" size={20} color={colors.primary} />
+            </Pressable>
+            <Pressable
               onPress={() => void startNewChat()}
-              style={({ pressed }) => [styles.headerIconBtn, pressed && styles.headerIconBtnPressed]}
+              style={({ pressed }) => [
+                styles.headerIconBtn,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+                pressed && styles.headerIconBtnPressed,
+              ]}
               accessibilityLabel="Start new chat"
               accessibilityRole="button"
             >
@@ -872,6 +964,86 @@ export function AICoachScreen({
       ) : (
         <View style={styles.footerPlaceholder} />
       )}
+
+      <Modal visible={showHistory} animationType="slide" transparent onRequestClose={() => setShowHistory(false)}>
+        <Pressable style={styles.historyBackdrop} onPress={() => setShowHistory(false)}>
+          <Pressable
+            style={[styles.historySheet, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.historySheetHeader}>
+              <View>
+                <Text style={[styles.historyTitle, { color: colors.text }]}>Previous chats</Text>
+                <Text style={[styles.historySubtitle, { color: colors.muted }]}>
+                  Tap a session to load its messages
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => setShowHistory(false)}
+                hitSlop={12}
+                accessibilityLabel="Close chat history"
+                style={[styles.historyCloseBtn, { backgroundColor: colors.surfaceMuted }]}
+              >
+                <Ionicons name="close" size={20} color={colors.text} />
+              </Pressable>
+            </View>
+
+            {historyLoading ? (
+              <View style={styles.historyEmpty}>
+                <Text style={[styles.historyEmptyText, { color: colors.muted }]}>Loading sessions…</Text>
+              </View>
+            ) : historySessions.length === 0 ? (
+              <View style={styles.historyEmpty}>
+                <Ionicons name="chatbubbles-outline" size={40} color={colors.muted} />
+                <Text style={[styles.historyEmptyTitle, { color: colors.text }]}>No saved chats yet</Text>
+                <Text style={[styles.historyEmptyText, { color: colors.muted }]}>
+                  Start a conversation and it will appear here.
+                </Text>
+              </View>
+            ) : (
+              <ScrollView style={styles.historyList} showsVerticalScrollIndicator={false}>
+                {historySessions.map((session) => {
+                  const isActive = chatSessionId === session.id;
+                  return (
+                    <Pressable
+                      key={session.id}
+                      onPress={() => void loadChatSession(session.id)}
+                      style={({ pressed }) => [
+                        styles.historyItem,
+                        {
+                          backgroundColor: isActive ? colors.chipBlue : colors.surfaceMuted,
+                          borderColor: isActive ? colors.primary : colors.border,
+                        },
+                        pressed && { opacity: 0.85 },
+                      ]}
+                    >
+                      <View style={styles.historyItemTop}>
+                        <Text style={[styles.historyItemTopic, { color: colors.text }]} numberOfLines={1}>
+                          {session.topic || "AI Coach"}
+                        </Text>
+                        {isActive ? (
+                          <View style={[styles.historyActivePill, { backgroundColor: colors.primary }]}>
+                            <Text style={styles.historyActivePillText}>Current</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      <Text style={[styles.historyItemMeta, { color: colors.muted }]}>
+                        {fmtSessionDate(session.started_at)} · {session.message_count} message
+                        {session.message_count === 1 ? "" : "s"}
+                      </Text>
+                      {session.preview ? (
+                        <Text style={[styles.historyItemPreview, { color: colors.text }]} numberOfLines={2}>
+                          {session.preview.replace(/\*\*/g, "")}
+                        </Text>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -1226,5 +1398,100 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: palette.primary,
+  },
+  historyBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.55)",
+    justifyContent: "flex-end",
+  },
+  historySheet: {
+    maxHeight: "78%",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    paddingTop: 18,
+    paddingHorizontal: screenPadding,
+    paddingBottom: Platform.OS === "ios" ? 28 : 18,
+  },
+  historySheetHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    marginBottom: 14,
+    gap: 12,
+  },
+  historyTitle: {
+    fontSize: 20,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+  },
+  historySubtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 18,
+  },
+  historyCloseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  historyList: {
+    maxHeight: 420,
+  },
+  historyItem: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 10,
+    gap: 6,
+  },
+  historyItemTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  historyItemTopic: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  historyActivePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 99,
+  },
+  historyActivePillText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  historyItemMeta: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  historyItemPreview: {
+    fontSize: 13,
+    lineHeight: 18,
+    opacity: 0.88,
+  },
+  historyEmpty: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 36,
+    gap: 10,
+  },
+  historyEmptyTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  historyEmptyText: {
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 19,
+    paddingHorizontal: 12,
   },
 });

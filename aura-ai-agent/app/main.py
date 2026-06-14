@@ -211,6 +211,46 @@ async def chat_history(session_id: int | None = None, email: str = Depends(get_c
     return {"session_id": sid, "messages": messages}
 
 
+@app.get("/agent/chat/sessions")
+async def list_chat_sessions(email: str = Depends(get_current_email)):
+    user_id = user_id_for_email(email)
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT cs.id,
+                   cs.topic,
+                   cs.start_date_time,
+                   COUNT(cm.id)::int AS message_count,
+                   (
+                     SELECT cm2.message FROM chat_message cm2
+                     WHERE cm2.session_id = cs.id
+                     ORDER BY cm2.id DESC LIMIT 1
+                   ) AS last_message
+            FROM chat_sessions cs
+            LEFT JOIN chat_message cm ON cm.session_id = cs.id
+            WHERE cs.user_id = %s
+            GROUP BY cs.id, cs.topic, cs.start_date_time
+            ORDER BY cs.start_date_time DESC NULLS LAST, cs.id DESC
+            LIMIT 50
+            """,
+            (user_id,),
+        ).fetchall()
+
+    sessions = []
+    for r in rows:
+        started = r["start_date_time"]
+        sessions.append(
+            {
+                "id": int(r["id"]),
+                "topic": str(r["topic"] or "AI Coach"),
+                "started_at": started.isoformat() if started else None,
+                "message_count": int(r["message_count"] or 0),
+                "preview": str(r["last_message"] or "")[:160],
+            }
+        )
+    return {"sessions": sessions}
+
+
 @app.post("/agent/chat/new-session")
 async def new_session(email: str = Depends(get_current_email)):
     user_id = user_id_for_email(email)
