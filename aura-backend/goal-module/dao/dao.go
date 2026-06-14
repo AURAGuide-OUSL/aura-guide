@@ -170,7 +170,7 @@ func scoreIDToLevel(score int) string {
 	case 3:
 		return "Industry Ready"
 	default:
-		return "—"
+		return "-"
 	}
 }
 

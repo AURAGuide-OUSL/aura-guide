@@ -175,7 +175,7 @@ function SkillSection({
                   Level: <Text style={[styles.levelValue, tc.text]}>{skill.current_level || "Not assessed"}</Text>
                 </Text>
                 <Text style={[styles.levelHint, tc.muted]}>
-                  Target: <Text style={[styles.levelValue, tc.text]}>{skill.required_level || "—"}</Text>
+                  Target: <Text style={[styles.levelValue, tc.text]}>{skill.required_level || "-"}</Text>
                 </Text>
               </View>
               <ProgressBar value={Math.min(skill.current_pct, 100)} color={barColor} />

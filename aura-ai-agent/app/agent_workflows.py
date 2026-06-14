@@ -10,6 +10,7 @@ from app.json_utils import (
     as_str_list,
     clean_coach_display_text,
     clean_coach_question_text,
+    extract_cv_analysis_object,
     extract_json_object,
 )
 from app.answer_intent import is_dont_know_answer
@@ -28,10 +29,10 @@ PROFESSIONAL_COMMUNICATION_SKILL = "Professional Communication"
 REFLECTION_SKILL = "Reflection and Self Assessment"
 
 REFLECTION_QUESTION_FALLBACKS = [
-    "What skill or habit have you strengthened most in the past two weeks—and what evidence do you have?",
+    "What skill or habit have you strengthened most in the past two weeks-and what evidence do you have?",
     "Which blocker slowed you down recently, and what will you adjust next week?",
     "Describe one deliverable you're proud of. What would you do differently with more time?",
-    "Where did collaboration go well—or poorly—in your last teamwork experience?",
+    "Where did collaboration go well-or poorly-in your last teamwork experience?",
 ]
 
 BEHAVIORAL_QUESTION_FALLBACKS = [
@@ -61,7 +62,7 @@ async def _coach_dont_know_interview(question: str) -> str:
 The candidate honestly said they do not know how to answer (or could not answer).
 
 Write plain-text feedback (NOT JSON):
-1. One warm sentence: it is okay not to know yet — honesty is fine.
+1. One warm sentence: it is okay not to know yet - honesty is fine.
 2. A concise STAR-style model answer they can learn from (Situation, Task, Action, Result).
 3. One short tip for tackling similar questions next time.
 
@@ -75,7 +76,7 @@ Do NOT criticize them as vague. Do NOT say they failed to provide a solution. Ma
     except Exception:
         pass
     return (
-        "That's completely okay — not knowing yet is part of learning. "
+        "That's completely okay - not knowing yet is part of learning. "
         "For this type of question, use STAR: describe a real Situation, your Task, "
         "the Actions you took, and the Result with measurable impact. "
         "Try drafting one example from school, work, or a project, even if small. "
@@ -107,7 +108,7 @@ Do NOT criticize them as vague or incomplete for not knowing. Max 220 words."""
     except Exception:
         pass
     return (
-        "That's fine — it's okay not to have this ready yet. "
+        "That's fine - it's okay not to have this ready yet. "
         f"Review the core ideas for **{skill_name}**, then walk through the task step by step "
         "with a simple example. Try again when ready; learning the model answer first is a good strategy."
     )
@@ -167,7 +168,7 @@ LIMIT 8
         for r in rows2:
             parts.append(f"{r['skill_name']} (custom task)")
     if not parts:
-        return "No recent technical tasks recorded — balance across all four skills."
+        return "No recent technical tasks recorded - balance across all four skills."
     return "; ".join(parts)
 
 
@@ -178,48 +179,150 @@ def _truncate(s: str, n: int = 14000) -> str:
     return s[:n] + "\n\n[truncated]"
 
 
-async def run_cv_analyze(email: str, cv_text: str, file_name: str) -> dict[str, Any]:
-    row = fetch_user_learning_row(email)
-    cv_text = _truncate(cv_text)
-    user_goal = row["goal_name"]
+def _cv_summary_from_lists(
+    strengths: list[str], weaknesses: list[str], improvements: list[str], user_goal: str
+) -> str:
+    goal_label = user_goal if user_goal and user_goal != "Unknown" else "your career goal"
+    summary_lines: list[str] = [
+        f"Resume feedback for **{goal_label}**",
+        "",
+        "**Strengths**",
+    ]
+    summary_lines.extend(
+        [f"• {x}" for x in strengths[:8]]
+        if strengths
+        else ["• Add clearer project and skills sections to highlight strengths."]
+    )
+    summary_lines.extend(["", "**Growth areas**"])
+    summary_lines.extend(
+        [f"• {x}" for x in weaknesses[:8]]
+        if weaknesses
+        else ["• Consider adding measurable outcomes to your experience bullets."]
+    )
+    if improvements:
+        summary_lines.extend(["", "**Suggested improvements**"])
+        summary_lines.extend([f"• {x}" for x in improvements[:6]])
+    return "\n".join(summary_lines)
 
-    system = """You are a strict CV analysis assistant.
+
+def _fallback_cv_analysis(cv_text: str, user_goal: str, file_name: str) -> dict[str, Any]:
+    """Deterministic fallback when the model cannot return parseable JSON."""
+    lower = (cv_text or "").lower()
+    strengths: list[str] = []
+    weaknesses: list[str] = []
+    improvements: list[str] = []
+
+    if any(w in lower for w in ("project", "intern", "experience", "developed", "built")):
+        strengths.append("Your resume mentions hands-on projects or experience - keep highlighting outcomes.")
+    if any(w in lower for w in ("python", "java", "javascript", "react", "sql", "git")):
+        strengths.append("Technical skills are listed, which helps recruiters scan for role fit quickly.")
+    if any(w in lower for w in ("university", "bachelor", "degree", "education")):
+        strengths.append("Education credentials are present and easy to locate.")
+
+    if "github" not in lower and "gitlab" not in lower:
+        weaknesses.append("Add a GitHub or portfolio link so reviewers can verify project work.")
+    if lower.count("%") < 1 and "increased" not in lower and "reduced" not in lower:
+        weaknesses.append("Use measurable results (percentages, time saved, users served) in bullet points.")
+    if len(cv_text) < 400:
+        weaknesses.append("The extracted text is very short - ensure the PDF is text-based, not a scanned image.")
+
+    improvements.append("Tailor the top third of your resume to match your target role keywords.")
+    improvements.append("Use action verbs and one clear result per bullet (STAR-style where possible).")
+    if user_goal and user_goal != "Unknown":
+        improvements.append(f"Emphasize skills and projects most relevant to **{user_goal}**.")
+
+    if not strengths:
+        strengths.append(
+            "Thank you for uploading your resume - we saved it so you can refine and re-analyse after edits."
+        )
+
+    chat_summary = _cv_summary_from_lists(strengths, weaknesses, improvements, user_goal)
+    return {
+        "strengths": strengths,
+        "weaknesses": weaknesses,
+        "improvements": improvements,
+        "chat_summary": chat_summary,
+        "_fallback": True,
+    }
+
+
+async def _request_cv_analysis_json(cv_text: str, user_goal: str) -> dict:
+    system = """You are a CV/resume analysis assistant for university students targeting tech careers.
 
 RULES:
-- Do not ask questions.
-- Do not explain anything.
-- Output ONLY valid JSON (no markdown fences, no commentary)."""
+- Output ONLY one JSON object. No markdown, no prose before or after.
+- Each array value must be a plain string (one short sentence).
+- Provide 3–5 items per array when the CV has enough content."""
 
-    user = f"""INPUTS:
-CV_CONTENT: {cv_text}
-CAREER_GOAL: {user_goal} (logged user's goal from the DB)
+    user = f"""CAREER_GOAL: {user_goal}
 
-TASK:
-Analyze the CV and identify strengths, weaknesses, and improvements based on the career goal.
+CV_TEXT:
+{cv_text}
 
-OUTPUT FORMAT (strict):
+Return JSON exactly in this shape:
 {{
-  "strengths": [],
-  "weaknesses": [],
-  "improvements": []
-}}
+  "strengths": ["..."],
+  "weaknesses": ["..."],
+  "improvements": ["..."]
+}}"""
 
-Each array MUST contain only plain strings (one sentence each). Do NOT use objects, maps, or nested structures inside arrays."""
-
-    raw = await structured_completion(system, user)
+    raw = await structured_completion(system, user, json_format=True)
     try:
-        data = extract_json_object(raw)
-    except Exception:
+        return extract_cv_analysis_object(raw)
+    except ValueError:
         repair = await structured_completion(
             system,
             user
-            + "\n\nYour previous reply was not valid JSON. Reply again with ONLY one JSON object "
-            "with keys strengths, weaknesses, improvements; each value is an array of plain strings only.",
+            + '\n\nYour last reply was invalid. Reply with ONLY JSON: {"strengths":["..."],"weaknesses":["..."],"improvements":["..."]}',
+            json_format=True,
         )
-        data = extract_json_object(repair)
+        return extract_cv_analysis_object(repair)
+
+
+async def run_cv_analyze(email: str, cv_text: str, file_name: str) -> dict[str, Any]:
+    row = fetch_user_learning_row(email)
+    cv_text = _truncate(cv_text, 9000)
+    user_goal = row["goal_name"]
+
+    try:
+        data = await _request_cv_analysis_json(cv_text, user_goal)
+    except Exception:
+        try:
+            short = _truncate(cv_text, 4500)
+            data = await _request_cv_analysis_json(short, user_goal)
+        except Exception:
+            uid = int(row["user_id"])
+            fb = _fallback_cv_analysis(cv_text, user_goal, file_name)
+            with get_conn() as conn:
+                conn.execute(
+                    """INSERT INTO user_cv_analysis (user_id, file_name, uploaded_at, strengths, weaknesses, improvements)
+                       VALUES (%s, %s, NOW(), %s::jsonb, %s::jsonb, %s::jsonb)
+                       ON CONFLICT (user_id) DO UPDATE SET
+                         file_name = EXCLUDED.file_name,
+                         uploaded_at = NOW(),
+                         strengths = EXCLUDED.strengths,
+                         weaknesses = EXCLUDED.weaknesses,
+                         improvements = EXCLUDED.improvements
+                    """,
+                    (
+                        uid,
+                        file_name[:500],
+                        Json(fb["strengths"]),
+                        Json(fb["weaknesses"]),
+                        Json(fb["improvements"]),
+                    ),
+                )
+            return {k: v for k, v in fb.items() if k != "_fallback"}
+
     strengths = as_str_list(data.get("strengths"))
     weaknesses = as_str_list(data.get("weaknesses"))
     improvements = as_str_list(data.get("improvements"))
+
+    if not strengths and not weaknesses and not improvements:
+        fb = _fallback_cv_analysis(cv_text, user_goal, file_name)
+        strengths = fb["strengths"]
+        weaknesses = fb["weaknesses"]
+        improvements = fb["improvements"]
 
     uid = int(row["user_id"])
     with get_conn() as conn:
@@ -242,15 +345,7 @@ Each array MUST contain only plain strings (one sentence each). Do NOT use objec
             ),
         )
 
-    # Chat/summary: Strengths + Growth areas only (readable bullets; improvements stay in DB/profile if needed)
-    summary_lines: list[str] = [
-        "Strengths",
-        *[f"• {x}" for x in strengths[:12]],
-        "",
-        "Growth areas",
-        *[f"• {x}" for x in weaknesses[:12]],
-    ]
-    chat_summary = "\n".join([x for x in summary_lines if x != ""])
+    chat_summary = _cv_summary_from_lists(strengths, weaknesses, improvements, user_goal)
 
     return {
         "strengths": strengths,
@@ -871,7 +966,7 @@ Score 2 (Moderate):
 Partially correct with useful parts; explain gaps without calling detailed work "vague."
 
 Score 3 (Industry Ready):
-Fully correct, clear reasoning, structured explanation — tell them the answer is good/strong.
+Fully correct, clear reasoning, structured explanation - tell them the answer is good/strong.
 
 --------------------------------------------------------------
 SKILL FOCUS (use only the line that matches SKILL)

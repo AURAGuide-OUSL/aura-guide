@@ -273,7 +273,7 @@ SELECT COALESCE((SELECT COUNT(*)::int FROM user_custom_tasks uct
 }
 
 func DeleteAgentTask(ctx context.Context, email string, userCommonTaskID int) error {
-	// Same semantics as DeleteTask — try custom first then agent linkage.
+	// Same semantics as DeleteTask - try custom first then agent linkage.
 	return DeleteTask(ctx, email, userCommonTaskID)
 }
 

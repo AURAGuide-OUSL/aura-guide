@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "llama3.2:1b"
     host: str = "0.0.0.0"
-    port: int = 8000
+    port: int = 8001
     cors_origins: str = "http://localhost:8081,http://localhost:8082,http://127.0.0.1:8081"
 
 

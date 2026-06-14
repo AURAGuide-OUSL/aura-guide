@@ -115,6 +115,55 @@ def extract_json_object(text: str) -> dict:
         raise
 
 
+def _extract_string_array(text: str, key: str) -> list[str]:
+    """Pull a JSON string array for key from messy model output."""
+    patterns = (
+        rf'"{re.escape(key)}"\s*:\s*\[(.*?)\]',
+        rf"'{re.escape(key)}'\s*:\s*\[(.*?)\]",
+        rf"{re.escape(key)}\s*:\s*\[(.*?)\]",
+    )
+    for pat in patterns:
+        m = re.search(pat, text, re.DOTALL | re.IGNORECASE)
+        if not m:
+            continue
+        inner = m.group(1)
+        items = re.findall(r'"((?:\\.|[^"\\])*)"', inner)
+        if not items:
+            items = re.findall(r"'((?:\\.|[^'\\])*)'", inner)
+        if items:
+            return [i.replace("\\n", "\n").strip() for i in items if i.strip()]
+    return []
+
+
+def extract_cv_analysis_object(text: str) -> dict:
+    """Parse CV analysis JSON (strengths, weaknesses, improvements arrays)."""
+    s = _strip_markdown_fences(text or "")
+    if not s:
+        raise ValueError("empty model response")
+
+    try:
+        data = extract_json_object(s)
+        if any(k in data for k in ("strengths", "weaknesses", "improvements")):
+            return data
+    except ValueError:
+        pass
+
+    strengths = _extract_string_array(s, "strengths")
+    weaknesses = _extract_string_array(s, "weaknesses")
+    improvements = _extract_string_array(s, "improvements")
+    if strengths or weaknesses or improvements:
+        return {
+            "strengths": strengths,
+            "weaknesses": weaknesses,
+            "improvements": improvements,
+        }
+
+    raise ValueError(
+        "could not read structured CV feedback from the model. "
+        "Please try again with a text-based PDF export."
+    )
+
+
 def _extract_fields_by_regex(text: str) -> dict | None:
     """Last-resort parser when the model mixes prose with partial JSON."""
     score_m = re.search(r'"score"\s*:\s*([123])', text)
@@ -184,7 +233,7 @@ def clean_coach_display_text(text: str) -> str:
     t = re.sub(r"\s*\{[\s\S]*?\"(?:clear|concise|updated|status)\"[\s\S]*?\}\s*", " ", t).strip()
     t = re.sub(r"^[`\"']+|[`\"']+$", "", t.strip())
     if t.startswith("{") and ("'id'" in t or '"id"' in t):
-        return "Please try again — the coach could not format this response. Tap Next question or restart the flow."
+        return "Please try again - the coach could not format this response. Tap Next question or restart the flow."
     return t.strip()
 
 
@@ -222,7 +271,7 @@ def coerce_cv_feedback_line(item: object) -> str:
             return "; ".join(p for p in parts if p)
         str_vals = [str(v).strip() for v in item.values() if isinstance(v, str) and str(v).strip()]
         if str_vals:
-            return " — ".join(str_vals)
+            return " - ".join(str_vals)
         return ""
     if isinstance(item, (int, float, bool)):
         return str(item).strip()

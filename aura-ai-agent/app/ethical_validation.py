@@ -13,7 +13,7 @@ ETHICAL_FEEDBACK = (
     "and genuine learning."
 )
 
-# Whole-word / phrase patterns only — avoids false positives like "lying" in "applying".
+# Whole-word / phrase patterns only - avoids false positives like "lying" in "applying".
 ETHICAL_FLAG_PATTERNS = (
     re.compile(r"\blies\b", re.I),
     re.compile(r"\blie\b", re.I),

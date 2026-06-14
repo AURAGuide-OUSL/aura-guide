@@ -139,7 +139,7 @@ export function OnboardingScreen({
               <Picker.Item label="Beginner" value="Beginner" />
               <Picker.Item label="Intermediate" value="Intermediate" />
               <Picker.Item label="Advanced" value="Advanced" />
-              <Picker.Item label="Not sure yet — discover in AI Coach" value="Unsure" />
+              <Picker.Item label="Not sure yet - discover in AI Coach" value="Unsure" />
             </PickerField>
             {softSkillLevel === "Unsure" ? (
               <Text style={styles.unsureHint}>

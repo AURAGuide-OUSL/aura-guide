@@ -1,97 +1,228 @@
 # AURA Guide
 
-AURA Guide is a comprehensive AI-driven application featuring a Go backend, a Python/FastAPI AI agent powered by LLaMA, and an Expo React Native frontend. 
+AURA Guide is an AI-driven career coach for undergraduate Software Engineering, Computer Science, and IT students. The stack:
 
-This repository contains three main components:
-1. **`aura-backend`**: A robust Go-based REST API for user management, tasks, and core application logic.
-2. **`aura-ai-agent`**: A Python FastAPI service that interfaces with a local Ollama LLM to power the AI features.
-3. **`aura-ui`**: An Expo React Native frontend that can be run on the web or as a standalone mobile application (Android/iOS).
+| Component | Role |
+|-----------|------|
+| **`aura-backend`** | Go REST API — auth, tasks, profile, PostgreSQL |
+| **`aura-ai-agent`** | Python FastAPI + Ollama — AI Coach, CV analysis, interviews |
+| **`aura-ui`** | Expo React Native — web, Expo Go, or standalone APK |
 
 ---
 
-## 🛠️ Complete Setup & Execution Guide
+## Architecture (mobile / APK)
 
-Follow these steps to run the entire stack locally.
+The mobile app **does not connect to PostgreSQL directly**. All data flows through your dev machine on the LAN:
 
-### 1. Start the Go Backend (`aura-backend`)
-Ensure PostgreSQL is running and the `aura` database is created using the provided `schema.sql`.
+```
+Phone (APK / Expo Go)
+    │  HTTP  :8080  (REST + JWT)
+    ▼
+Go backend  ──►  PostgreSQL (localhost on your laptop)
+    │
+    │  HTTP  :8001  (AI routes, same JWT)
+    ▼
+AI agent  ──►  PostgreSQL + Ollama (localhost)
+```
+
+Both backends must listen on **`0.0.0.0`** so the phone can reach them over Wi‑Fi. The database stays on the host machine only.
+
+---
+
+## Prerequisites
+
+- **PostgreSQL** — create database `aura` and apply `aura-backend/schema.sql`
+- **Go 1.21+**
+- **Python 3.10+**
+- **Node.js 18+**
+- **[Ollama](https://ollama.com/)** — `ollama pull llama3.2:1b`
+- **Expo / EAS CLI** (for mobile builds) — `npm install -g eas-cli`
+
+---
+
+## 1. Start the Go backend
 
 ```bash
 cd aura-backend
 
-# Set required environment variables (update with your DB credentials)
 export DATABASE_URL="postgres://username:password@localhost:5432/aura"
 export JWT_SECRET="your_secure_secret_key"
+# Optional: when Go proxies CV to the agent
+export AI_AGENT_URL="http://127.0.0.1:8001"
 
-# Download dependencies and run
 go mod tidy
 go run main.go
 ```
-*The backend will be available at `http://localhost:8080` (or your LAN IP `192.168.x.x:8080`).*
 
-### 2. Start the AI Agent (`aura-ai-agent`)
-Ensure [Ollama](https://ollama.com/) is installed and the model is pulled (`ollama pull llama3.2:1b`).
+- Listens on **`http://0.0.0.0:8080`** (all interfaces).
+- Migrations and seed data run automatically on startup (best-effort).
+- Native mobile apps use **Bearer JWT** in `Authorization` headers (no browser cookies).
+
+---
+
+## 2. Start the AI agent
 
 ```bash
 cd aura-ai-agent
 
-# Create and activate a virtual environment
 python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install requirements
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
-# Run the FastAPI server
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+cp .env.example .env               # edit DATABASE_URL + JWT_SECRET to match Go
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 ```
-*The agent will be available at `http://localhost:8000` (or your LAN IP `192.168.x.x:8000`).*
+
+- Default port is **8001** (matches the mobile app and Go `AI_AGENT_URL`).
+- `JWT_SECRET` and `DATABASE_URL` **must match** the Go backend.
+- Health check: `GET http://localhost:8001/health`
 
 ---
 
-## 📱 Running the Frontend (`aura-ui`)
+## 3. Configure API URLs for the frontend
 
-Before starting the frontend, ensure that `aura-ui/src/config.ts` is correctly pointing to your backend services. 
-*   If testing on **Web** or an **Android Emulator**, using `localhost` is fine.
-*   If testing on a **Physical Mobile Device**, update `config.ts` to use your computer's local network IP address (e.g., `192.168.8.105`) so the phone can reach your laptop over WiFi.
+All service URLs are set via environment variables (not hardcoded in source).
 
-Navigate to the UI folder and install dependencies:
+```bash
+cd aura-ui
+cp .env.example .env
+```
+
+Edit `.env` — replace `192.168.8.105` with **your laptop's LAN IP**:
+
+```bash
+# Find LAN IP (Linux/macOS):
+hostname -I | awk '{print $1}'
+
+EXPO_PUBLIC_API_BASE_URL=http://YOUR_LAN_IP:8080
+EXPO_PUBLIC_AI_AGENT_BASE_URL=http://YOUR_LAN_IP:8001
+```
+
+| Target | URL pattern |
+|--------|-------------|
+| Web browser (`npm run web`) | `http://localhost:8080` / `:8001` (defaults if `.env` unset) |
+| Android emulator | `http://10.0.2.2:8080` / `:8001` (defaults if `.env` unset) |
+| Physical phone / APK | **Must set `.env`** with your LAN IP |
+
+Phone and laptop must be on the **same Wi‑Fi**. Allow ports **8080** and **8001** through your firewall if needed.
+
+---
+
+## 4. Run the frontend
+
 ```bash
 cd aura-ui
 npm install
 ```
 
-### Option A: Run as a Web App
-To run the application in your browser:
+### Web
+
 ```bash
 npm run web
 ```
 
-### Option B: Run via Expo Go (Development Mobile App)
-To run the app on your physical phone during development without building an APK:
+### Expo Go (development on a physical phone)
+
 ```bash
 npm start
 ```
-*A QR code will appear in your terminal. Download the **Expo Go** app on your phone, scan the QR code with your camera (or inside the Expo app), and the application will load instantly.*
 
-### Option C: Build a Standalone Mobile App (APK / IPA)
-To create a fully installable `.apk` for Android or `.ipa` for iOS using Expo Application Services (EAS):
+Scan the QR code with Expo Go. Ensure `.env` has your LAN IP.
 
-1. **Install EAS CLI:**
-   ```bash
-   npm install -g eas-cli
-   ```
-2. **Log in to Expo:**
-   ```bash
-   eas login
-   ```
-3. **Build the APK (Android):**
-   ```bash
-   eas build -p android --profile preview
-   ```
-4. **Build the App (iOS Simulator):**
-   ```bash
-   eas build -p ios --profile preview
-   ```
+### Android emulator
 
-> **Note:** The `preview` profile is configured in `eas.json` to specifically output an `.apk` file rather than a Google Play Store App Bundle (`.aab`). Wait for the cloud build to finish, and use the provided link or QR code in the terminal to download and install the standalone app on your device.
+```bash
+npm run android
+```
+
+Uses `10.0.2.2` automatically when `.env` is not set.
+
+---
+
+## 5. Build a standalone APK (EAS)
+
+The app uses **EAS Build** (cloud) with the `preview` profile, which outputs an installable **`.apk`**.
+
+### One-time setup
+
+```bash
+npm install -g eas-cli
+eas login
+cd aura-ui
+eas init          # link Expo project if prompted
+```
+
+### Before each APK build
+
+1. Update **`aura-ui/.env`** with your LAN IP (for local dev consistency).
+2. Update **`aura-ui/eas.json`** → `build.preview.env` with the **same** URLs (EAS cloud builds bake these in):
+
+```json
+"env": {
+  "EXPO_PUBLIC_API_BASE_URL": "http://YOUR_LAN_IP:8080",
+  "EXPO_PUBLIC_AI_AGENT_BASE_URL": "http://YOUR_LAN_IP:8001"
+}
+```
+
+3. Ensure Go backend, AI agent, PostgreSQL, and Ollama are running on your laptop when you **use** the APK.
+
+### Build
+
+```bash
+cd aura-ui
+npm run build:apk
+# equivalent: eas build -p android --profile preview
+```
+
+When the cloud build finishes, download the APK from the link in the terminal and install it on your phone.
+
+### Android HTTP (cleartext)
+
+Local/LAN backends use HTTP. `app.config.ts` sets `android.usesCleartextTraffic: true` so the APK can call `http://192.168.x.x` endpoints. For production deployments, use HTTPS instead.
+
+---
+
+## Troubleshooting (mobile / APK)
+
+| Symptom | Likely cause | Fix |
+|---------|--------------|-----|
+| Login or API fails on phone | Wrong IP in `.env` / `eas.json` | Update LAN IP; rebuild APK if using EAS |
+| AI Coach / CV upload fails | Agent not on **8001** or not on `0.0.0.0` | Run uvicorn with `--host 0.0.0.0 --port 8001` |
+| "Network request failed" on APK | Cleartext blocked or firewall | Confirm `usesCleartextTraffic`; open ports 8080/8001 |
+| Agent auth errors | JWT mismatch | Same `JWT_SECRET` in Go and agent `.env` |
+| Empty tasks / skills | DB not seeded | Restart Go backend; check PostgreSQL connection |
+| Android emulator can't reach API | Using `localhost` instead of `10.0.2.2` | Remove `.env` for emulator defaults, or set `10.0.2.2` |
+
+---
+
+## Port reference
+
+| Service | Port | Env / config |
+|---------|------|--------------|
+| Go backend | **8080** | `PORT` (default 8080) |
+| AI agent | **8001** | `PORT` in agent `.env` or `--port 8001` |
+| Ollama | **11434** | `OLLAMA_BASE_URL` |
+| PostgreSQL | **5432** | `DATABASE_URL` (server-side only) |
+| Expo dev server | **8081** | automatic |
+
+---
+
+## Project layout
+
+```
+aura-guide/
+├── aura-backend/       Go API + PostgreSQL access
+├── aura-ai-agent/      FastAPI + Ollama agent
+├── aura-ui/            Expo React Native app
+│   ├── app.config.ts   Expo config (cleartext HTTP, env URLs)
+│   ├── eas.json        EAS build profiles (preview → APK)
+│   ├── .env.example    Copy to .env for API URLs
+│   └── src/config.ts   Reads EXPO_PUBLIC_* at runtime
+└── README.md           This file
+```
+
+See also:
+
+- [`aura-backend/README.md`](aura-backend/README.md) — API examples
+- [`aura-ai-agent/README.md`](aura-ai-agent/README.md) — agent endpoints
+- [`aura-ui/README.md`](aura-ui/README.md) — frontend dev commands

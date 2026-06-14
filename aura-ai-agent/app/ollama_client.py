@@ -42,7 +42,7 @@ Use 7Cs principles:
 Clear, Concise, Complete, Correct, Considerate, Concrete, Courteous
 
 EXIT RULE (critical):
-When the user's message indicates they want to end the session — they say "exit", "quit", or "stop" as the main intent (after trimming punctuation) —
+When the user's message indicates they want to end the session - they say "exit", "quit", or "stop" as the main intent (after trimming punctuation) -
 you MUST respond ONLY with this exact single line (nothing else before or after):
 Session ended. Good job today!
 
@@ -112,9 +112,11 @@ async def chat_completion_with_flow(messages: list[dict], topic_flow: str | None
     return content.strip()
 
 
-async def structured_completion(system_prompt: str, user_prompt: str) -> str:
+async def structured_completion(
+    system_prompt: str, user_prompt: str, *, json_format: bool = False
+) -> str:
     """Single-turn completion with retries on transient Ollama/network failures."""
-    payload = {
+    payload: dict = {
         "model": settings.ollama_model,
         "messages": [
             {"role": "system", "content": system_prompt},
@@ -122,6 +124,8 @@ async def structured_completion(system_prompt: str, user_prompt: str) -> str:
         ],
         "stream": False,
     }
+    if json_format:
+        payload["format"] = "json"
     url = f"{settings.ollama_base_url.rstrip('/')}/api/chat"
 
     last: Exception | None = None
