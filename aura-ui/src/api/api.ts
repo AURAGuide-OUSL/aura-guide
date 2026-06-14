@@ -586,6 +586,23 @@ export const api = {
     return response.json() as Promise<{ session_id: number }>;
   },
 
+  async getAgentChatSessions() {
+    const response = await fetch(`${CONFIG.AI_AGENT_BASE_URL}/agent/chat/sessions`, {
+      method: "GET",
+      headers: await authHeaders(false),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json() as Promise<{
+      sessions: {
+        id: number;
+        topic: string;
+        started_at: string | null;
+        message_count: number;
+        preview: string;
+      }[];
+    }>;
+  },
+
   /**
    * wipe the local authentication token to terminate the session.
    */

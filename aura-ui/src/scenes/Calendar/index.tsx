@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Calendar, ICalendarEventBase, Mode } from "react-native-big-calendar";
 
 import { palette } from "../../theme";
+import { useTheme } from "../../theme/ThemeContext";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { api } from "../../api/api";
 import { screenPadding } from "../../styles/screenStyles";
@@ -13,6 +14,8 @@ import { screenPadding } from "../../styles/screenStyles";
 export function CalendarScreen({ onBack }: { onBack: () => void }) {
   const insets = useSafeAreaInsets();
   const { height: windowH } = useWindowDimensions();
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [mode, setMode] = useState<Mode>("month");
   /** Controls which period is visible (pager center). */
@@ -125,32 +128,32 @@ export function CalendarScreen({ onBack }: { onBack: () => void }) {
   const calendarTheme = useMemo(
     () => ({
       palette: {
-        primary: { main: palette.primary, contrastText: "#FFFFFF" },
-        nowIndicator: palette.secondary,
+        primary: { main: colors.primary, contrastText: "#FFFFFF" },
+        nowIndicator: colors.secondary,
         gray: {
-          100: "#F1F5F9",
-          200: "#E2E8F0",
-          300: "#CBD5E1",
-          500: palette.muted,
-          800: palette.text,
+          100: isDark ? colors.backgroundAccent : "#F1F5F9",
+          200: isDark ? colors.border : "#E2E8F0",
+          300: isDark ? colors.surfaceMuted : "#CBD5E1",
+          500: colors.muted,
+          800: colors.text,
         },
-        moreLabel: palette.muted,
+        moreLabel: colors.muted,
       },
       isRTL: false,
       typography: {
-        xs: { fontSize: 10 },
-        sm: { fontSize: 12 },
-        xl: { fontSize: 13 },
-        moreLabel: { fontSize: 11 },
+        xs: { fontSize: 10, color: colors.text },
+        sm: { fontSize: 12, color: colors.text },
+        xl: { fontSize: 13, color: colors.text },
+        moreLabel: { fontSize: 11, color: colors.muted },
       },
       eventCellOverlappings: [
         { main: "#4F46E5", contrastText: "#FFFFFF" },
         { main: "#0891B2", contrastText: "#FFFFFF" },
         { main: "#059669", contrastText: "#FFFFFF" },
       ] as const,
-      moreLabel: { color: palette.muted },
+      moreLabel: { color: colors.muted },
     }),
-    [],
+    [colors, isDark],
   );
 
   const onSwipeDateChange = useCallback((range: Date[]) => {
@@ -160,7 +163,7 @@ export function CalendarScreen({ onBack }: { onBack: () => void }) {
   }, []);
 
   return (
-    <GestureHandlerRootView style={[styles.flexOne, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+    <GestureHandlerRootView style={[styles.flexOne, { paddingBottom: Math.max(insets.bottom, 8), backgroundColor: colors.background }]}>
       <View style={[styles.flexOne, styles.screenPad]}>
         <ScreenHeader title="Calendar" subtitle="Tasks on your timeline" onBack={onBack} />
 
@@ -181,20 +184,20 @@ export function CalendarScreen({ onBack }: { onBack: () => void }) {
 
         <View style={styles.navCard}>
           <Pressable accessibilityLabel="Previous" onPress={() => navigate(-1)} style={styles.navCircle}>
-            <Ionicons name="chevron-back" size={22} color={palette.primary} />
+            <Ionicons name="chevron-back" size={22} color={colors.primary} />
           </Pressable>
           <Text style={styles.navLabel} numberOfLines={2}>{rangeLabel}</Text>
           <Pressable accessibilityLabel="Next" onPress={() => navigate(1)} style={styles.navCircle}>
-            <Ionicons name="chevron-forward" size={22} color={palette.primary} />
+            <Ionicons name="chevron-forward" size={22} color={colors.primary} />
           </Pressable>
           <Pressable onPress={goToday} style={styles.todayChip}>
             <Text style={styles.todayChipText}>Today</Text>
           </Pressable>
         </View>
 
-        <View style={[styles.calendarShell, { minHeight: calendarBlockHeight }]}>
+        <View style={[styles.calendarShell, { minHeight: calendarBlockHeight, backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Calendar
-            key={`${mode}-${focusDate.toDateString()}`}
+            key={`${mode}-${focusDate.toDateString()}-${isDark ? "dark" : "light"}`}
             theme={calendarTheme as any}
             events={calendarEvents}
             height={calendarBlockHeight}
@@ -210,6 +213,7 @@ export function CalendarScreen({ onBack }: { onBack: () => void }) {
             verticalScrollEnabled
             dayHeaderHighlightColor="rgba(79, 70, 229, 0.45)"
             weekDayHeaderHighlightColor="rgba(37, 99, 235, 0.2)"
+            calendarCellTextStyle={() => ({ color: colors.text })}
             onChangeDate={onSwipeDateChange}
             onPressEvent={handleDeleteTask}
             calendarCellStyle={(date?: Date) => {
@@ -248,7 +252,8 @@ export function CalendarScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof palette, isDark: boolean) =>
+  StyleSheet.create({
   flexOne: { flex: 1 },
   screenPad: {
     paddingHorizontal: screenPadding,
@@ -264,18 +269,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.92)",
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: colors.border,
   },
   modeChipActive: {
-    backgroundColor: palette.primary,
-    borderColor: palette.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   modeChipText: {
     fontSize: 13,
     fontWeight: "700",
-    color: palette.text,
+    color: colors.text,
   },
   modeChipTextActive: {
     color: "#FFFFFF",
@@ -288,9 +293,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.96)",
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: colors.border,
   },
   navCircle: {
     width: 40,
@@ -298,20 +303,20 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: palette.chipBlue,
+    backgroundColor: colors.chipBlue,
   },
   navLabel: {
     flex: 1,
     textAlign: "center",
     fontSize: 14,
     fontWeight: "800",
-    color: palette.text,
+    color: colors.text,
   },
   todayChip: {
     paddingHorizontal: 12,
     paddingVertical: 9,
     borderRadius: 12,
-    backgroundColor: palette.text,
+    backgroundColor: isDark ? colors.primary : colors.text,
   },
   todayChipText: {
     color: "#FFFFFF",
@@ -322,8 +327,8 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
   summary: {
     flexDirection: "row",
@@ -332,14 +337,14 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 18,
     borderRadius: 20,
-    backgroundColor: palette.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: colors.border,
   },
   summaryItem: { flex: 1, alignItems: "center" },
-  summaryValue: { fontSize: 26, fontWeight: "900", color: palette.primary },
-  summaryCaption: { marginTop: 4, fontSize: 13, fontWeight: "600", color: palette.muted },
-  summaryDivider: { width: 1, height: 40, backgroundColor: palette.border },
+  summaryValue: { fontSize: 26, fontWeight: "900", color: colors.primary },
+  summaryCaption: { marginTop: 4, fontSize: 13, fontWeight: "600", color: colors.muted },
+  summaryDivider: { width: 1, height: 40, backgroundColor: colors.border },
   refreshFab: {
     marginLeft: 8,
     width: 48,
@@ -347,6 +352,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: palette.primary,
+    backgroundColor: colors.primary,
   },
 });
