@@ -293,30 +293,6 @@ export function TasksScreen({
         </View>
       ) : null}
 
-      {editingTask ? (
-        <View style={styles.addTaskSheet}>
-          <View style={styles.addTaskToolbar}>
-            <Text style={[styles.addTaskToolbarTitle, tc.text]}>Edit Task</Text>
-            <Pressable onPress={() => setEditingTask(null)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Text style={styles.cancelLink}>Cancel</Text>
-            </Pressable>
-          </View>
-          <AppCard style={styles.addCard}>
-            <View style={commonStyles.stackSm}>
-              <InputField label="Task Name" placeholder="Task name" value={editTaskName} onChangeText={setEditTaskName} />
-              <View style={styles.dateInputRow}>
-                <View style={commonStyles.flexOne}>
-                  <InputField label="Start Date" placeholder="YYYY-MM-DD" value={editStartDate} onChangeText={setEditStartDate} />
-                </View>
-                <View style={commonStyles.flexOne}>
-                  <InputField label="End Date" placeholder="YYYY-MM-DD" value={editEndDate} onChangeText={setEditEndDate} />
-                </View>
-              </View>
-              <PrimaryButton label="Save changes" onPress={saveEditedTask} />
-            </View>
-          </AppCard>
-        </View>
-      ) : null}
 
       {shown.length === 0 ? (
         <AppCard style={styles.emptyCard}>
@@ -333,8 +309,45 @@ export function TasksScreen({
       ) : null}
 
       <View style={commonStyles.stackMd}>
-        {shown.map((task) => (
-          <AppCard key={`${task.task_origin ?? "custom"}-${task.id}`} style={styles.taskCard}>
+        {shown.map((task) => {
+          const isEditing = editingTask?.id === task.id;
+          return (
+          <AppCard
+            key={`${task.task_origin ?? "custom"}-${task.id}`}
+            style={[styles.taskCard, isEditing && styles.taskCardEditing]}
+          >
+            {isEditing ? (
+              <View style={styles.inlineEdit}>
+                <View style={styles.inlineEditHeader}>
+                  <View style={styles.inlineEditTitleRow}>
+                    <View style={styles.editIconCircle}>
+                      <Ionicons name="create-outline" size={18} color={palette.primary} />
+                    </View>
+                    <Text style={[styles.inlineEditTitle, tc.text]}>Update task</Text>
+                  </View>
+                  <Pressable
+                    onPress={() => setEditingTask(null)}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    accessibilityLabel="Cancel edit"
+                  >
+                    <Text style={styles.cancelLink}>Cancel</Text>
+                  </Pressable>
+                </View>
+                <View style={commonStyles.stackSm}>
+                  <InputField label="Task Name" placeholder="Task name" value={editTaskName} onChangeText={setEditTaskName} />
+                  <View style={styles.dateInputRow}>
+                    <View style={commonStyles.flexOne}>
+                      <InputField label="Start Date" placeholder="YYYY-MM-DD" value={editStartDate} onChangeText={setEditStartDate} />
+                    </View>
+                    <View style={commonStyles.flexOne}>
+                      <InputField label="End Date" placeholder="YYYY-MM-DD" value={editEndDate} onChangeText={setEditEndDate} />
+                    </View>
+                  </View>
+                  <PrimaryButton label="Save changes" onPress={saveEditedTask} />
+                </View>
+              </View>
+            ) : (
+              <>
             <View style={styles.cardTop}>
               <View style={commonStyles.flexOne}>
                 <Text selectable style={[styles.taskDescription, tc.text]}>
@@ -422,8 +435,11 @@ export function TasksScreen({
                 <Text style={styles.hintText}>Submit your answer from AI Coach to receive feedback.</Text>
               </View>
             )}
+              </>
+            )}
           </AppCard>
-        ))}
+          );
+        })}
       </View>
     </ScrollView>
   );
@@ -499,6 +515,37 @@ const styles = StyleSheet.create({
   },
   taskCard: {
     padding: 16,
+  },
+  taskCardEditing: {
+    borderColor: palette.primary,
+    borderWidth: 1.5,
+    backgroundColor: palette.chipBlue,
+  },
+  inlineEdit: {
+    gap: 14,
+  },
+  inlineEditHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  inlineEditTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  editIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: palette.surface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  inlineEditTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: palette.text,
   },
   taskDescription: {
     fontSize: 15,
