@@ -78,6 +78,7 @@ func main() {
 	r.Use(mid.Recoverer)
 
 	r.Post("/signup", authApi.SignupHandler)
+	r.Post("/auth/validate-email", authApi.ValidateEmailHandler)
 	r.Post("/login", authApi.LoginHandler)
 	r.Post("/auth/signup", authApi.SignupHandler)
 	r.Post("/auth/signin", authApi.SigninHandler)
@@ -96,6 +97,7 @@ func main() {
 		r.Get("/skills", skillApi.GetSkillsHandler)
 		r.Get("/skill/categories", skillApi.GetCategoriesHandler)
 		r.Get("/goals", goalApi.GetGoalsHandler)
+		r.Get("/goals/summary", goalApi.GetGoalSummaryHandler)
 
 		r.Put("/onboarding/{userData}", onboardingApi.UpdateOnboardingHandler)
 
@@ -108,8 +110,12 @@ func main() {
 		r.Get("/aura-life-coach/GitConceptKnowledgeQuestions", auraLifeCoachApi.GetGitConceptKnowledgeQuestionsHandler)
 		r.Get("/aura-life-coach/BehavioralInterviewFeedback", auraLifeCoachApi.GetBehavioralInterviewFeedbackHandler)
 		r.Post("/aura-life-coach/cv/upload", auraLifeCoachApi.UploadCVHandler)
+		r.Post("/aura-life-coach/cv/upload-pdf", auraLifeCoachApi.UploadCVPDFHandler)
+		r.Post("/aura-life-coach/cv/extract-pdf", auraLifeCoachApi.UploadCVPDFExtractHandler)
 		r.Post("/aura-life-coach/cv/analyze", auraLifeCoachApi.AnalyzeCVHandler)
 		r.Get("/aura-life-coach/cv/feedback", auraLifeCoachApi.GetCVFeedbackHandler)
+		r.Get("/aura-life-coach/cv/list", auraLifeCoachApi.ListCVsHandler)
+		r.Get("/aura-life-coach/cv/download", auraLifeCoachApi.DownloadCVHandler)
 
 		r.Post("/aura-ethical-validator/answer", ethicsApi.ValidateAnswerHandler)
 		r.Get("/aura-ethical-validator/answer/status", ethicsApi.GetValidationStatusHandler)
@@ -124,10 +130,13 @@ func main() {
 		r.Put("/task-plan/tasks/{taskId}/complete", taskPlanApi.CompleteTaskHandler)
 		r.Put("/task-plan/tasks/{taskId}", taskPlanApi.UpdateTaskHandler)
 		r.Delete("/task-plan/tasks/{taskId}", taskPlanApi.DeleteTaskHandler)
+		r.Delete("/task-plan/agent-tasks/{taskId}", taskPlanApi.DeleteAgentTaskHandler)
 
 		r.Get("/progress/overview", progressApi.GetOverviewHandler)
 		r.Get("/progress/currentTask", progressApi.GetCurrentTaskHandler)
 		r.Get("/progress/CompletedTasks", progressApi.GetCompletedTasksHandler)
+		r.Get("/progress/dashboard", progressApi.GetDashboardSummaryHandler)
+		r.Post("/progress/check-in", progressApi.RecordCheckInHandler)
 
 		r.Get("/badges/earned", badgeApi.GetEarnedBadgesHandler)
 
@@ -139,6 +148,8 @@ func main() {
 
 		r.Get("/notification/dailyTaskReminder", notificationApi.GetDailyTaskReminderHandler)
 		r.Get("/notification/motivationalQuote", notificationApi.GetMotivationalQuoteHandler)
+		r.Get("/notification/list", notificationApi.ListNotificationsHandler)
+		r.Post("/notification/mark-all-read", notificationApi.MarkAllReadHandler)
 
 		r.Post("/settings/preferences", settingsApi.UpdatePreferencesHandler)
 		r.Post("/settings/notificationPreferences", settingsApi.UpdateNotificationPreferencesHandler)

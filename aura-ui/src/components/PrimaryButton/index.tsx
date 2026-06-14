@@ -5,30 +5,41 @@ import { palette } from "../../theme";
 export function PrimaryButton({
   label,
   onPress,
+  variant = "primary",
   secondary,
   disabled,
   icon,
+  style,
 }: {
   label: string;
   onPress?: () => void;
+  variant?: "primary" | "secondary" | "danger";
   secondary?: boolean;
   disabled?: boolean;
   icon?: ReactNode;
+  style?: any;
 }) {
+  const isSecondary = secondary || variant === "secondary";
+  const isDanger = variant === "danger";
+
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
         styles.button,
-        secondary ? styles.buttonSecondary : styles.buttonPrimary,
+        isSecondary ? styles.buttonSecondary : isDanger ? styles.buttonDanger : styles.buttonPrimary,
         pressed && !disabled ? styles.buttonPressed : undefined,
         disabled ? styles.buttonDisabled : undefined,
+        style,
       ]}
     >
       <View style={styles.buttonContent}>
         {icon}
-        <Text style={[styles.buttonLabel, secondary ? styles.buttonLabelSecondary : styles.buttonLabelPrimary]}>
+        <Text style={[
+          styles.buttonLabel, 
+          isSecondary ? styles.buttonLabelSecondary : styles.buttonLabelPrimary
+        ]}>
           {label}
         </Text>
       </View>
@@ -52,6 +63,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.border,
   },
+  buttonDanger: {
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.3)",
+  },
   buttonPressed: {
     opacity: 0.88,
   },
@@ -69,7 +85,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   buttonLabelPrimary: {
-    color: palette.surface,
+    color: "#FFFFFF",
   },
   buttonLabelSecondary: {
     color: palette.text,

@@ -3,6 +3,6 @@
   "compilerOptions": {
     "strict": true
   },
-  "include": ["App.tsx", "src-native/**/*.ts", "src-native/**/*.tsx"],
-  "exclude": ["src", "node_modules"]
+  "include": ["App.tsx", "src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["node_modules"]
 }

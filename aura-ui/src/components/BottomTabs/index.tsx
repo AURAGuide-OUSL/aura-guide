@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   tabIconWrapActive: {
-    backgroundColor: "#DBEAFE",
+    backgroundColor: palette.chipBlue,
   },
   tabLabel: {
     fontSize: 11,

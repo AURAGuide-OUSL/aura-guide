@@ -52,6 +52,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   segmentLabelActive: {
-    color: palette.primary,
+    color: palette.primaryMuted,
   },
 });

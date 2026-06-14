@@ -144,6 +144,32 @@ func UploadCVPDFHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(res)
 }
 
+func UploadCVPDFExtractHandler(w http.ResponseWriter, r *http.Request) {
+	_, ok := r.Context().Value(middleware.UserEmailKey).(string)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if !strings.EqualFold(r.Method, http.MethodPost) {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	text, name, err := service.ExtractCVPDF(r.Context(), r)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"cv_text":   text,
+		"file_name": name,
+	})
+}
+
 func DownloadCVHandler(w http.ResponseWriter, r *http.Request) {
 	email, ok := r.Context().Value(middleware.UserEmailKey).(string)
 	if !ok {

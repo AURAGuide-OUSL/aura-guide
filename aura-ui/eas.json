@@ -1,0 +1,29 @@
+{
+  "cli": {
+    "version": ">= 3.8.1"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "http://192.168.8.105:8080",
+        "EXPO_PUBLIC_AI_AGENT_BASE_URL": "http://192.168.8.105:8001"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "http://192.168.8.105:8080",
+        "EXPO_PUBLIC_AI_AGENT_BASE_URL": "http://192.168.8.105:8001"
+      }
+    },
+    "production": {}
+  },
+  "submit": {
+    "production": {}
+  }
+}

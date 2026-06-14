@@ -46,6 +46,7 @@ ios/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.agent
 
 # Logs
 logs
@@ -81,3 +82,21 @@ Thumbs.db
 
 # Go module files
 go.sum
+
+# Python virtual environments
+.venv/
+venv/
+env/
+ENV/
+aura-ai-agent/.venv/
+aura-ai-agent/venv/
+__pycache__/
+*.py[cod]
+
+# Compiled Go binaries
+aura-backend/aura-backend
+**/bin/
+
+# Uploaded CV PDFs (local storage)
+data/cv/
+aura-backend/data/cv/
