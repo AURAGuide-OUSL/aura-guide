@@ -118,6 +118,16 @@ CREATE TABLE user_badge (
    issued_date_time TIMESTAMP
 );
 
+-- STORED CV ANALYSIS (AI agent, replaces ephemeral CV store for uploads via PDF pipeline)
+CREATE TABLE IF NOT EXISTS user_cv_analysis (
+   user_id INT PRIMARY KEY REFERENCES user_student(id),
+   file_name VARCHAR(512),
+   uploaded_at TIMESTAMP WITH TIME ZONE,
+   strengths JSONB DEFAULT '[]'::jsonb,
+   weaknesses JSONB DEFAULT '[]'::jsonb,
+   improvements JSONB DEFAULT '[]'::jsonb
+);
+
 -- CHAT SESSIONS
 CREATE TABLE chat_sessions (
    id SERIAL PRIMARY KEY,
@@ -151,9 +161,38 @@ CREATE TABLE user_notification (
    is_read BOOLEAN
 );
 
+-- USER CV
+CREATE TABLE user_cv (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES user_student(id),
+    file_name VARCHAR(255) NOT NULL,
+    file_path TEXT NOT NULL,
+    file_size BIGINT,
+    mime_type VARCHAR(100) DEFAULT 'application/pdf',
+    uploaded_at TIMESTAMP DEFAULT NOW(),
+    extracted_text TEXT,
+    strengths TEXT,
+    improvements TEXT,
+);
+
 -- SEED DATA
 INSERT INTO status (name) VALUES ('pending'), ('in_progress'), ('completed'), ('abandoned');
 
 INSERT INTO category (name) VALUES ('Technical'), ('Soft Skills'), ('Academic');
 
 INSERT INTO goals (name) VALUES ('Software Engineer'), ('Backend Developer'), ('QA Engineer');
+
+INSERT INTO skills (name, category_id) VALUES
+('Python', 1),
+('JavaScript', 1),
+('SQL', 1),
+('Code Understanding', 1),
+('Problem Solving', 1),
+('Data Structures', 1),
+('Algorithms', 1),
+('Communication', 2),
+('Teamwork', 2),
+('Time Management', 2),
+('Critical Thinking', 2),
+('Research', 3),
+('Academic Writing', 3);

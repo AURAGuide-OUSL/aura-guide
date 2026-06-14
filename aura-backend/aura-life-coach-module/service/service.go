@@ -119,7 +119,7 @@ func readPdfFromMultipart(r *http.Request) ([]byte, string, error) {
 		return nil, "", fmt.Errorf("multipart invalid (use multipart/form-data with a file part): %w", err)
 	}
 	if r.MultipartForm == nil || len(r.MultipartForm.File) == 0 {
-		return nil, "", fmt.Errorf("no file part in upload — send the PDF as form field \"file\"")
+		return nil, "", fmt.Errorf("no file part in upload - send the PDF as form field \"file\"")
 	}
 	for _, fhs := range r.MultipartForm.File {
 		for _, fh := range fhs {
@@ -145,7 +145,7 @@ func readPdfFromMultipart(r *http.Request) ([]byte, string, error) {
 			return data, name, nil
 		}
 	}
-	return nil, "", fmt.Errorf("no valid PDF found — upload a single .pdf file")
+	return nil, "", fmt.Errorf("no valid PDF found - upload a single .pdf file")
 }
 
 func fallbackCVPlainText(fileName string, parseErr error) string {
@@ -160,6 +160,30 @@ func fallbackCVPlainText(fileName string, parseErr error) string {
 	return msg
 }
 
+// ExtractCVPDF reads a PDF upload, extracts plain text, stores the file, and returns text for client-side agent analysis.
+func ExtractCVPDF(ctx context.Context, r *http.Request) (cvText string, fileName string, err error) {
+	email, ok := r.Context().Value(middleware.UserEmailKey).(string)
+	if !ok || strings.TrimSpace(email) == "" {
+		return "", "", fmt.Errorf("authorization required")
+	}
+
+	data, fn, err := readPdfFromMultipart(r)
+	if err != nil {
+		return "", "", err
+	}
+
+	text, err := pdfutil.PlainText(data, 15<<20)
+	if err != nil || strings.TrimSpace(text) == "" {
+		text = fallbackCVPlainText(fn, err)
+	}
+
+	if err := dao.PersistCVPDF(ctx, email, fn, data); err != nil {
+		log.Printf("persist cv pdf for %s: %v", email, err)
+	}
+
+	return text, fn, nil
+}
+
 // AnalyzeCVPDF extracts text locally, then asks the FastAPI agent + Ollama to analyze and persist to user_cv_analysis.
 func AnalyzeCVPDF(ctx context.Context, r *http.Request) (*agentclient.CVAnalyzeResponse, error) {
 	email, ok := r.Context().Value(middleware.UserEmailKey).(string)
@@ -167,7 +191,7 @@ func AnalyzeCVPDF(ctx context.Context, r *http.Request) (*agentclient.CVAnalyzeR
 		return nil, fmt.Errorf("authorization required")
 	}
 
-	data, fn, err := readPdfFromMultipart(r)
+	text, fn, err := ExtractCVPDF(ctx, r)
 	if err != nil {
 		return nil, err
 	}
@@ -177,21 +201,12 @@ func AnalyzeCVPDF(ctx context.Context, r *http.Request) (*agentclient.CVAnalyzeR
 		return nil, fmt.Errorf("authorization required")
 	}
 
-	text, err := pdfutil.PlainText(data, 15<<20)
-	if err != nil || strings.TrimSpace(text) == "" {
-		text = fallbackCVPlainText(fn, err)
-	}
-
 	res, err := agentclient.PostCVAnalyze(ctx, token, agentclient.CVAnalyzeRequest{
 		CVText:   text,
 		FileName: fn,
 	})
 	if err != nil {
 		return nil, err
-	}
-
-	if err := dao.PersistCVPDF(ctx, email, fn, data); err != nil {
-		log.Printf("persist cv pdf for %s: %v", email, err)
 	}
 
 	return res, nil

@@ -58,9 +58,22 @@ npm run web
 npm run android
 npm run ios
 npm run typecheck
+npm run build:apk    # EAS cloud build → Android APK
 ```
 
-## 8. Notes
+## 8. API URLs (physical device / APK)
 
-- The old Vite web source is left in the repository for reference, but the Expo app now uses `App.tsx` and `src-native/`.
-- The TypeScript config excludes the legacy `src/` folder so the Expo app can build cleanly without the old web-only files.
+Copy `.env.example` to `.env` and set your laptop's LAN IP:
+
+```bash
+cp .env.example .env
+# EXPO_PUBLIC_API_BASE_URL=http://YOUR_LAN_IP:8080
+# EXPO_PUBLIC_AI_AGENT_BASE_URL=http://YOUR_LAN_IP:8001
+```
+
+Before building an APK, also update the same URLs in `eas.json` (`build.preview.env`). See the root [`README.md`](../README.md) for the full mobile setup guide.
+
+## 9. Notes
+
+- The Expo app uses `App.tsx` and the `src/` folder. All screens load live data from the Go API and Python AI agent — there is no mock data layer.
+- Android APK builds allow HTTP to LAN backends via `usesCleartextTraffic` in `app.config.ts`.

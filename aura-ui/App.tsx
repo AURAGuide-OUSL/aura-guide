@@ -1,12 +1,15 @@
-import React, { useEffect, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import "react-native-gesture-handler";
+import React, { useCallback, useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 
-import { palette } from "./src/theme";
+import { setTheme } from "./src/theme";
+import { ThemeProvider } from "./src/theme/ThemeContext";
 import { Route, TabRoute, UserProfile } from "./src/types";
 import { initialProfile, tabRoutes } from "./src/constants";
-import { notificationSeed } from "./src-native/mockData";
+import { NotificationItem } from "./src/scenes/Notifications";
 
 // Components
 import { BottomTabs } from "./src/components/BottomTabs";
@@ -14,11 +17,11 @@ import { BottomTabs } from "./src/components/BottomTabs";
 // Scenes
 import { SplashScreen } from "./src/scenes/Splash";
 import { SignInScreen } from "./src/scenes/SignIn";
-import { SignUpScreen } from "./src/scenes/SignUp";
+import { SignUpScreen, SignUpDraft } from "./src/scenes/SignUp";
 import { ResetPasswordScreen } from "./src/scenes/ResetPassword";
 import { OnboardingScreen } from "./src/scenes/Onboarding";
 import { DashboardScreen } from "./src/scenes/Dashboard";
-import { AICoachScreen } from "./src/scenes/AICoach";
+import { AICoachScreen, PendingTaskAnswerPayload } from "./src/scenes/AICoach";
 import { TasksScreen } from "./src/scenes/Tasks";
 import { GoalsScreen } from "./src/scenes/Goals";
 import { ProfileScreen } from "./src/scenes/Profile";
@@ -31,10 +34,19 @@ import { TermsScreen } from "./src/scenes/Terms";
 import { api } from "./src/api/api";
 
 const goalIdToLabel: Record<number, string> = {
-  1: "I wanted to be a software engineer",
-  2: "I wanted to be a backend developer",
-  3: "I wanted to be a QA engineer",
-  4: "I wanted to be a DevOps engineer",
+  1: "Software Engineer",
+  2: "Backend Developer",
+  3: "QA Engineer",
+  4: "DevOps Engineer",
+};
+
+const emptySignUpDraft: SignUpDraft = {
+  email: "",
+  password: "",
+  confirmPassword: "",
+  acceptTerms: false,
+  showPassword: false,
+  emailChecked: false,
 };
 
 export default function App() {
@@ -42,19 +54,44 @@ export default function App() {
   const [tab, setTab] = useState<TabRoute>("dashboard");
   const [user, setUser] = useState<UserProfile>(initialProfile);
   const [tempPassword, setTempPassword] = useState("");
-  const [notifications, setNotifications] = useState(notificationSeed);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [settings, setSettings] = useState({
     notifications: true,
     darkMode: false,
     language: "English (US)",
   });
+  const [signupDraft, setSignupDraft] = useState<SignUpDraft>(emptySignUpDraft);
   const [termsBackRoute, setTermsBackRoute] = useState<Route>("signup");
+  const [pendingAgentTask, setPendingAgentTask] = useState<PendingTaskAnswerPayload | undefined>(undefined);
+  const [isReturningUser, setIsReturningUser] = useState(true);
+
+  const clearPendingAgentTask = useCallback(() => {
+    setPendingAgentTask(undefined);
+  }, []);
+
+  const loadNotifications = useCallback(async () => {
+    try {
+      const data = await api.getNotifications();
+      const list = Array.isArray(data?.notifications) ? data.notifications : [];
+      setNotifications(list);
+    } catch {
+      setNotifications([]);
+    }
+  }, []);
 
   const fetchProfile = async () => {
     try {
       const profileData = await api.getUserProfile();
-      const score = await api.getSkillScore().catch(() => ({ current_score: 0 }));
-      // Map backend fields to frontend UserProfile
+      const pct =
+        typeof profileData.skill_score_percent === "number"
+          ? profileData.skill_score_percent
+          : typeof profileData.current_score === "number"
+            ? profileData.current_score
+            : 0;
+      const readiness =
+        typeof profileData.skill_readiness_label === "string"
+          ? profileData.skill_readiness_label
+          : "";
       setUser({
         firstName: profileData.first_name || "",
         lastName: profileData.last_name || "",
@@ -66,9 +103,11 @@ export default function App() {
         softSkillLevel: profileData.soft_skill_level || "",
         availabilityType: profileData.availability_type || "",
         availabilityHours: profileData.availability_hours ? String(profileData.availability_hours) : "",
-        goal: goalIdToLabel[profileData.goal_id || 1] || "I wanted to be a software engineer",
+        goal: goalIdToLabel[profileData.goal_id || 1] || "Software Engineer",
         goalId: profileData.goal_id || 1,
-        currentScore: score.current_score || 0,
+        currentScore: pct,
+        skillReadinessLabel: readiness || undefined,
+        recommendation: profileData.recommendation ?? "",
         joinedDate: initialProfile.joinedDate,
       });
       return true;
@@ -79,45 +118,75 @@ export default function App() {
 
   useEffect(() => {
     const checkAuth = async () => {
+      const returning = (await AsyncStorage.getItem("aura_returning_user")) === "1";
+      setIsReturningUser(returning);
       const ok = await fetchProfile();
       if (ok) {
+        await api.recordCheckIn().catch(() => {});
+        await loadNotifications();
         setRoute("dashboard");
       } else {
         setRoute("signin");
       }
     };
 
-    const timer = setTimeout(checkAuth, 2000); // Keep splash for a bit
+    const timer = setTimeout(checkAuth, 2000);
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    AsyncStorage.getItem("aura_returning_user").then((v) => setIsReturningUser(v === "1"));
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.getItem("aura_dark_mode").then((v) => {
+      if (v === "1") setSettings((s) => ({ ...s, darkMode: true }));
+    });
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.setItem("aura_dark_mode", settings.darkMode ? "1" : "0");
+    setTheme(settings.darkMode);
+  }, [settings.darkMode]);
+
   const handleSignIn = async (email?: string, password?: string) => {
-    if (email && password) {
-      try {
-        await api.login({ email, password });
-        const ok = await fetchProfile();
-        if (ok) setRoute("dashboard");
-      } catch (err) {
-        alert("Login failed: " + (err as Error).message);
+    const normalizedEmail = (email ?? "").trim().toLowerCase();
+    const passwordValue = password ?? "";
+    if (!normalizedEmail || !passwordValue) {
+      alert("Enter your email and password to sign in.");
+      return;
+    }
+    try {
+      await api.login({ email: normalizedEmail, password: passwordValue });
+      await api.recordCheckIn().catch(() => {});
+      const ok = await fetchProfile();
+      if (ok) {
+        await AsyncStorage.setItem("aura_returning_user", "1");
+        setIsReturningUser(true);
+        await loadNotifications();
+        setRoute("dashboard");
       }
-    } else {
-      // Legacy or manual trigger
-      setRoute("dashboard");
+    } catch (err) {
+      alert("Login failed: " + (err as Error).message);
     }
   };
 
   const handleSignUp = (email: string, password?: string) => {
     setUser((prev) => ({ ...prev, email }));
     if (password) setTempPassword(password);
+    setSignupDraft(emptySignUpDraft);
     setRoute("onboarding");
   };
 
   const handleOnboardingComplete = async (profile: any) => {
     try {
-      // profile already contains all fields + password
       await api.signup(profile);
-      alert("Signup successful! Please sign in with your credentials.");
-      setRoute("signin");
+      await api.login({ email: profile.email, password: profile.password });
+      const ok = await fetchProfile();
+      if (ok) {
+        setIsReturningUser(false);
+        setRoute("dashboard");
+      }
     } catch (err) {
       alert("Signup failed: " + (err as Error).message);
     }
@@ -125,12 +194,24 @@ export default function App() {
 
   const handleSignOut = async () => {
     await api.logout();
+    setUser(initialProfile);
+    setNotifications([]);
+    setRoute("signin");
+    setTab("dashboard");
+  };
+
+  const handleDeleteAccount = async () => {
+    await api.deleteAccount();
+    setUser(initialProfile);
+    setNotifications([]);
+    setPendingAgentTask(undefined);
+    setIsReturningUser(false);
     setRoute("signin");
     setTab("dashboard");
   };
 
   const activeRoute = tabRoutes.includes(route as any) ? tab : route;
-  const appBg = settings.darkMode ? "#0B1220" : palette.background;
+  const appBg = settings.darkMode ? "#0F172A" : "#F8FAFC";
 
   const renderContent = () => {
     switch (activeRoute) {
@@ -147,11 +228,16 @@ export default function App() {
       case "signup":
         return (
           <SignUpScreen
+            draft={signupDraft}
+            onDraftChange={setSignupDraft}
             onOpenTerms={() => {
               setTermsBackRoute("signup");
               setRoute("terms");
             }}
-            onOpenSignIn={() => setRoute("signin")}
+            onOpenSignIn={() => {
+              setSignupDraft(emptySignUpDraft);
+              setRoute("signin");
+            }}
             onContinue={handleSignUp}
           />
         );
@@ -159,14 +245,38 @@ export default function App() {
         return <ResetPasswordScreen onBack={() => setRoute("signin")} />;
       case "onboarding":
         return (
-          <OnboardingScreen initialEmail={user.email} initialPassword={tempPassword} onComplete={handleOnboardingComplete} />
+          <OnboardingScreen
+            initialEmail={user.email}
+            initialPassword={tempPassword}
+            onBack={() => setRoute("signup")}
+            onComplete={handleOnboardingComplete}
+          />
         );
       case "dashboard":
-        return <DashboardScreen user={user} onNavigate={setRoute} onSignOut={handleSignOut} />;
+        return (
+          <DashboardScreen
+            user={user}
+            isReturningUser={isReturningUser}
+            onNavigate={setRoute}
+            onNavigateTab={setTab}
+            onSignOut={handleSignOut}
+          />
+        );
       case "aiCoach":
-        return <AICoachScreen />;
+        return (
+          <AICoachScreen pendingTaskAnswer={pendingAgentTask} onConsumedPendingTask={clearPendingAgentTask} />
+        );
       case "tasks":
-        return <TasksScreen onNavigateCalendar={() => setRoute("calendar")} />;
+        return (
+          <TasksScreen
+            onNavigateCalendar={() => setRoute("calendar")}
+            onRequestAgentTaskAnswer={(p) => {
+              setRoute("dashboard");
+              setPendingAgentTask(p);
+              setTab("aiCoach");
+            }}
+          />
+        );
       case "goals":
         return <GoalsScreen />;
       case "profile":
@@ -174,6 +284,7 @@ export default function App() {
           <ProfileScreen
             user={user}
             onNavigateSettings={() => setRoute("settings")}
+            onSignOut={handleSignOut}
             onProfileUpdated={async () => {
               await fetchProfile();
             }}
@@ -190,6 +301,7 @@ export default function App() {
             }}
             onBack={() => setRoute("profile")}
             onSignOut={handleSignOut}
+            onDeleteAccount={handleDeleteAccount}
           />
         );
       case "notifications":
@@ -197,7 +309,15 @@ export default function App() {
           <NotificationsScreen
             notifications={notifications}
             onBack={() => setRoute("dashboard")}
-            onMarkAllRead={() => setNotifications((n) => n.map((item) => ({ ...item, read: true })))}
+            onRefresh={loadNotifications}
+            onMarkAllRead={async () => {
+              try {
+                await api.markAllNotificationsRead();
+              } catch {
+                /* ignore */
+              }
+              setNotifications((n) => n.map((item) => ({ ...item, read: true })));
+            }}
           />
         );
       case "calendar":
@@ -215,13 +335,15 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <View style={styles.container}>
-        <StatusBar style="dark" />
-        <SafeAreaView style={[styles.safeArea, { backgroundColor: appBg }]} edges={["top", "left", "right"]}>
-          {renderContent()}
-        </SafeAreaView>
-        {showTabs && <BottomTabs current={tab} onNavigate={(route: TabRoute) => setTab(route)} />}
-      </View>
+      <ThemeProvider isDark={settings.darkMode}>
+        <View style={styles.container}>
+          <StatusBar style={settings.darkMode ? "light" : "dark"} />
+          <SafeAreaView style={[styles.safeArea, { backgroundColor: appBg }]} edges={["top", "left", "right"]}>
+            {renderContent()}
+          </SafeAreaView>
+          {showTabs && <BottomTabs current={tab} onNavigate={(route: TabRoute) => setTab(route)} />}
+        </View>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
@@ -229,7 +351,6 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: palette.background,
   },
   safeArea: {
     flex: 1,

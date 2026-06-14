@@ -85,7 +85,7 @@ func SyncForUser(ctx context.Context, email string) error {
 		for _, milestone := range []int{3, 7, 14, 30, 60} {
 			if streak >= milestone {
 				title := fmt.Sprintf("%d-day streak", milestone)
-				msg := fmt.Sprintf("Congratulations — you've logged in %d days in a row. Keep the momentum going!", milestone)
+				msg := fmt.Sprintf("Congratulations - you've logged in %d days in a row. Keep the momentum going!", milestone)
 				_ = insertIfNewToday(ctx, userID, "achievement", title, msg)
 			}
 		}

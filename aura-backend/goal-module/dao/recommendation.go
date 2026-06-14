@@ -81,7 +81,7 @@ func UpdateCareerRecommendationIfReady(ctx context.Context, userID int, currentG
 	var text string
 	if strings.EqualFold(strings.TrimSpace(fit.Name), strings.TrimSpace(current)) {
 		text = fmt.Sprintf(
-			"You are industry ready on %s. Your skill profile strongly matches this track — keep completing tasks to stay sharp.",
+			"You are industry ready on %s. Your skill profile strongly matches this track - keep completing tasks to stay sharp.",
 			current,
 		)
 	} else {

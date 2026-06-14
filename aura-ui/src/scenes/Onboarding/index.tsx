@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { Picker } from "@react-native-picker/picker";
-import { palette, commonStyles } from "../../theme";
+import { commonStyles } from "../../theme";
+import { useTheme } from "../../theme/ThemeContext";
 import { AppCard } from "../../components/AppCard";
 import { InputField } from "../../components/InputField";
 import { PickerField } from "../../components/PickerField";
@@ -13,10 +14,12 @@ import { initialProfile } from "../../constants";
 export function OnboardingScreen({
   initialEmail,
   initialPassword,
+  onBack,
   onComplete,
 }: {
   initialEmail: string;
   initialPassword?: string;
+  onBack: () => void;
   onComplete: (profile: any) => void;
 }) {
   const [step, setStep] = useState(1);
@@ -31,6 +34,29 @@ export function OnboardingScreen({
   const [softSkillLevel, setSoftSkillLevel] = useState(initialProfile.softSkillLevel);
   const [availabilityType, setAvailabilityType] = useState(initialProfile.availabilityType);
   const [availabilityHours, setAvailabilityHours] = useState(initialProfile.availabilityHours);
+  const { colors } = useTheme();
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        screenContent: {
+          paddingHorizontal: 20,
+          paddingTop: 18,
+          paddingBottom: 24,
+          gap: 16,
+          backgroundColor: colors.background,
+        },
+        kicker: { color: colors.primary, fontWeight: "700" },
+        onboardingTitle: { fontSize: 28, fontWeight: "800", color: colors.text },
+        onboardingSubtitle: { color: colors.muted, lineHeight: 22 },
+        sectionCard: { gap: 14 },
+        actionRow: { flexDirection: "row", gap: 12 },
+        progressLabel: { fontSize: 13, color: colors.muted, fontWeight: "600" },
+        progressValue: { fontSize: 13, color: colors.text, fontWeight: "700" },
+        unsureHint: { fontSize: 13, lineHeight: 20, color: colors.muted, fontWeight: "600" },
+      }),
+    [colors],
+  );
 
   const progress = step === 1 ? 50 : 100;
   const canContinue = step === 1
@@ -47,8 +73,8 @@ export function OnboardingScreen({
 
       <AppCard style={styles.sectionCard}>
         <View style={commonStyles.progressSummaryRow}>
-          <Text style={commonStyles.helperText}>Onboarding progress</Text>
-          <Text style={commonStyles.helperText}>{progress}% complete</Text>
+          <Text style={styles.progressLabel}>Onboarding progress</Text>
+          <Text style={styles.progressValue}>{progress}% complete</Text>
         </View>
         <ProgressBar value={progress} />
 
@@ -56,13 +82,13 @@ export function OnboardingScreen({
           <View style={commonStyles.stackMd}>
             <InputField label="First Name" placeholder="Enter your first name" value={firstName} onChangeText={setFirstName} />
             <InputField label="Last Name" placeholder="Enter your last name" value={lastName} onChangeText={setLastName} />
-            <InputField
-              label="Email"
-              placeholder="you@university.edu"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-            />
+            {/*<InputField*/}
+            {/*  label="Email"*/}
+            {/*  placeholder="you@university.edu"*/}
+            {/*  value={email}*/}
+            {/*  onChangeText={setEmail}*/}
+            {/*  keyboardType="email-address"*/}
+            {/*/>*/}
           </View>
         ) : (
           <View style={commonStyles.stackMd}>
@@ -97,10 +123,10 @@ export function OnboardingScreen({
               onValueChange={(itemValue) => setGoal(itemValue)}
             >
               <Picker.Item label="Select Goal" value="" />
-              <Picker.Item label="I wanted to be a software engineer" value="1" />
-              <Picker.Item label="I wanted to be a backend developer" value="2" />
-              <Picker.Item label="I wanted to be a QA engineer" value="3" />
-              <Picker.Item label="I wanted to be a DevOps engineer" value="4" />
+              <Picker.Item label="Software Engineer" value="1" />
+              <Picker.Item label="Backend Developer" value="2" />
+              <Picker.Item label="QA Engineer" value="3" />
+              <Picker.Item label="DevOps Engineer" value="4" />
             </PickerField>
             <PickerField label="Initial technical skill level" selectedValue={technicalSkillLevel} onValueChange={(itemValue) => setTechnicalSkillLevel(itemValue)}>
               <Picker.Item label="Select level" value="" />
@@ -113,7 +139,13 @@ export function OnboardingScreen({
               <Picker.Item label="Beginner" value="Beginner" />
               <Picker.Item label="Intermediate" value="Intermediate" />
               <Picker.Item label="Advanced" value="Advanced" />
+              <Picker.Item label="Not sure yet - discover in AI Coach" value="Unsure" />
             </PickerField>
+            {softSkillLevel === "Unsure" ? (
+              <Text style={styles.unsureHint}>
+                After signup, open AI Coach - “Help to improve my communication skills” for a guided session that informs your soft-skill level.
+              </Text>
+            ) : null}
             <PickerField label="Availability type" selectedValue={availabilityType} onValueChange={(itemValue) => setAvailabilityType(itemValue)}>
               <Picker.Item label="Select type" value="" />
               <Picker.Item label="Daily" value="daily" />
@@ -121,15 +153,15 @@ export function OnboardingScreen({
             </PickerField>
             <PickerField label="Time availability (hours)" selectedValue={availabilityHours} onValueChange={(itemValue) => setAvailabilityHours(itemValue)}>
               <Picker.Item label="Select hours" value="" />
-              {Array.from({ length: 20 }, (_, i) => (
-                <Picker.Item key={i + 1} label={`${i + 1}`} value={`${i + 1}`} />
+              {Array.from({ length: 24 }, (_, i) => (
+                <Picker.Item key={i + 1} label={`${i + 1} hour${i === 0 ? "" : "s"}`} value={`${i + 1}`} />
               ))}
             </PickerField>
           </View>
         )}
 
         <View style={styles.actionRow}>
-          {step > 1 ? <PrimaryButton label="Back" onPress={() => setStep(1)} secondary /> : null}
+          <PrimaryButton label="Back" onPress={() => (step > 1 ? setStep(1) : onBack())} secondary />
           <PrimaryButton
             label={step === 1 ? "Next" : "Complete Setup"}
             onPress={() => {
@@ -139,8 +171,8 @@ export function OnboardingScreen({
               }
 
               onComplete({
-                firstName,
-                lastName,
+                first_name: firstName,
+                last_name: lastName,
                 email,
                 password: initialPassword,
                 university,
@@ -160,32 +192,3 @@ export function OnboardingScreen({
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  screenContent: {
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 24,
-    gap: 16,
-  },
-  kicker: {
-    color: palette.primary,
-    fontWeight: "700",
-  },
-  onboardingTitle: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: palette.text,
-  },
-  onboardingSubtitle: {
-    color: palette.muted,
-    lineHeight: 22,
-  },
-  sectionCard: {
-    gap: 14,
-  },
-  actionRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-});

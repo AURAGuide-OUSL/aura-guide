@@ -1,7 +1,16 @@
-import React, { ReactNode } from "react";
+import React, { Children, ReactElement, ReactNode, cloneElement, isValidElement, useMemo } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
 import { Picker } from "@react-native-picker/picker";
-import { palette } from "../../theme";
+import { useTheme } from "../../theme/ThemeContext";
+
+function themedPickerItems(children: ReactNode, textColor: string): ReactNode {
+  return Children.map(children, (child) => {
+    if (isValidElement(child) && child.type === Picker.Item) {
+      return cloneElement(child as ReactElement<{ color?: string }>, { color: textColor });
+    }
+    return child;
+  });
+}
 
 export function PickerField({
   label,
@@ -14,6 +23,41 @@ export function PickerField({
   onValueChange: (value: string) => void;
   children: ReactNode;
 }) {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        inputGroup: { gap: 8 },
+        inputLabel: { fontSize: 14, fontWeight: "700", color: colors.text },
+        pickerWrapper: {
+          height: 52,
+          borderRadius: 16,
+          backgroundColor: colors.surfaceMuted,
+          borderWidth: 1,
+          borderColor: colors.border,
+          justifyContent: "center",
+          overflow: "hidden",
+        },
+        picker: {
+          marginHorizontal: 8,
+          color: colors.text,
+          backgroundColor: colors.surfaceMuted,
+          borderWidth: 0,
+          ...(Platform.OS === "web" ? ({ paddingRight: 28 } as any) : {}),
+        },
+      }),
+    [colors],
+  );
+
+  const webSelectStyle =
+    Platform.OS === "web"
+      ? ({
+          color: colors.text,
+          backgroundColor: colors.surfaceMuted,
+          colorScheme: isDark ? "dark" : "light",
+        } as any)
+      : null;
+
   return (
     <View style={styles.inputGroup}>
       <Text style={styles.inputLabel}>{label}</Text>
@@ -21,48 +65,13 @@ export function PickerField({
         <Picker
           selectedValue={selectedValue}
           onValueChange={onValueChange}
-          style={[
-            styles.picker,
-            Platform.OS === "web"
-              ? ({
-                  appearance: "none",
-                  WebkitAppearance: "none",
-                  MozAppearance: "none",
-                  outlineWidth: 0,
-                } as any)
-              : null,
-          ]}
-          dropdownIconColor={palette.primary}
+          style={[styles.picker, webSelectStyle]}
+          itemStyle={Platform.OS === "ios" ? { color: colors.text } : undefined}
+          dropdownIconColor={colors.primary}
         >
-          {children}
+          {themedPickerItems(children, colors.text)}
         </Picker>
       </View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  inputGroup: {
-    gap: 8,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: palette.text,
-  },
-  pickerWrapper: {
-    height: 52,
-    borderRadius: 16,
-    backgroundColor: "#F8FBFF",
-    borderWidth: 1,
-    borderColor: palette.border,
-    justifyContent: "center",
-  },
-  picker: {
-    marginHorizontal: 8,
-    color: palette.text,
-    backgroundColor: "transparent",
-    borderWidth: 0,
-    ...(Platform.OS === "web" ? ({ paddingRight: 28 } as any) : {}),
-  },
-});
