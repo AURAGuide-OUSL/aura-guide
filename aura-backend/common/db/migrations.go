@@ -27,6 +27,14 @@ func runMigrations(ctx context.Context) error {
 
 func ensureUniqueIndexes(ctx context.Context) error {
 	_, err := Pool.Exec(ctx, `
+CREATE TABLE IF NOT EXISTS user_cv_analysis (
+   user_id INT PRIMARY KEY REFERENCES user_student(id),
+   file_name VARCHAR(512),
+   uploaded_at TIMESTAMP WITH TIME ZONE,
+   strengths JSONB DEFAULT '[]'::jsonb,
+   weaknesses JSONB DEFAULT '[]'::jsonb,
+   improvements JSONB DEFAULT '[]'::jsonb
+);
 CREATE UNIQUE INDEX IF NOT EXISTS status_name_unique ON status (lower(trim(name)));
 CREATE UNIQUE INDEX IF NOT EXISTS category_name_unique ON category (lower(trim(name)));
 CREATE UNIQUE INDEX IF NOT EXISTS goals_name_unique ON goals (lower(trim(name)));
