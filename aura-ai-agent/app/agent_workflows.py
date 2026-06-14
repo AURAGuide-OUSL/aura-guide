@@ -12,6 +12,7 @@ from app.json_utils import (
     clean_coach_question_text,
     extract_json_object,
 )
+from app.ethical_validation import check_answer_ethics
 from app.ollama_client import structured_completion
 from app.skills_repo import skill_id, status_id_by_name, upsert_user_skill_score
 
@@ -251,6 +252,18 @@ OUTPUT FORMAT:
 async def interview_evaluate(
     email: str, question_number: int, question: str, user_answer: str
 ) -> dict[str, Any]:
+    uid = int(fetch_user_learning_row(email)["user_id"])
+    ethics = check_answer_ethics(user_answer)
+    if not ethics.ethical:
+        with get_conn() as conn:
+            upsert_user_skill_score(conn, uid, INTERVIEW_SKILL, 1)
+        return {
+            "question_number": question_number,
+            "score": 1,
+            "feedback": ethics.message,
+            "ethical_flag": True,
+        }
+
     system = """You are a behavioral interview evaluator.
 
 RULES:
@@ -279,7 +292,6 @@ OUTPUT FORMAT:
   "feedback": ""
 }}"""
 
-    uid = int(fetch_user_learning_row(email)["user_id"])
     try:
         raw = await structured_completion(system, user)
         try:
@@ -435,6 +447,18 @@ OUTPUT FORMAT:
 async def reflection_evaluate(
     email: str, question_number: int, question: str, user_answer: str
 ) -> dict[str, Any]:
+    uid = int(fetch_user_learning_row(email)["user_id"])
+    ethics = check_answer_ethics(user_answer)
+    if not ethics.ethical:
+        with get_conn() as conn:
+            upsert_user_skill_score(conn, uid, REFLECTION_SKILL, 1)
+        return {
+            "question_number": question_number,
+            "score": 1,
+            "feedback": ethics.message,
+            "ethical_flag": True,
+        }
+
     system = """You are a reflection evaluator.
 
 RULES:
@@ -462,7 +486,6 @@ OUTPUT FORMAT:
   "feedback": ""
 }}"""
 
-    uid = int(fetch_user_learning_row(email)["user_id"])
     try:
         raw = await structured_completion(system, user)
         try:
@@ -714,6 +737,17 @@ async def evaluate_task_answer(
         ).fetchone()
     if not chk:
         raise ValueError("task not found for user")
+
+    ethics = check_answer_ethics(user_answer)
+    if not ethics.ethical:
+        with get_conn() as conn:
+            upsert_user_skill_score(conn, uid, skill_name, 1)
+        return {
+            "skill": skill_name,
+            "score": 1,
+            "feedback_message": ethics.message,
+            "ethical_flag": True,
+        }
 
     system = """You are a technical skill evaluator for a learning system.
 

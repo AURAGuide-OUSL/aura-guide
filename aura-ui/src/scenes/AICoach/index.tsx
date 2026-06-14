@@ -21,7 +21,7 @@ import { api } from "../../api/api";
 import { screenPadding } from "../../styles/screenStyles";
 import { prettifyCvLine } from "../../utils/cvFeedback";
 import { formatCoachFeedback, formatCoachQuestion } from "../../utils/coachText";
-import { showAlert } from "../../utils/alert";
+import { confirmAction, showAlert } from "../../utils/alert";
 import { useTheme } from "../../theme/ThemeContext";
 
 const COMPOSER_MIN_HEIGHT = 44;
@@ -250,6 +250,37 @@ export function AICoachScreen({
     clearComposerInput();
   }, [clearComposerInput]);
 
+  const startNewChat = useCallback(async () => {
+    const ok = await confirmAction(
+      "Start new chat?",
+      "Your previous session stays saved, but this screen will reset so you can begin fresh.",
+    );
+    if (!ok) return;
+
+    setIsTyping(true);
+    try {
+      const res = await api.agentNewChatSession();
+      setChatSessionId(res.session_id);
+      setMessages([
+        {
+          id: Date.now(),
+          type: "aura",
+          content:
+            "Fresh chat started. Choose a guided path below, upload your CV, or ask for a new task when you are ready.",
+          timestamp: fmtTime(new Date()),
+          category: "New chat",
+        },
+      ]);
+      setCvLocalSummary("");
+      setFileName("");
+      resetToHome();
+    } catch (e) {
+      showAlert("Could not start new chat", (e as Error).message);
+    } finally {
+      setIsTyping(false);
+    }
+  }, [resetToHome]);
+
   const runAssignTask = async () => {
     pushUser("Assign me a new task");
     setShowComposer(false);
@@ -394,8 +425,12 @@ export function AICoachScreen({
         });
         setChatSessionId(res.session_id);
         pushAura(formatCoachFeedback(res.feedback_message || "Thanks - review your skill matrix on Goals."), "Feedback");
-        setPhase({ kind: "home" });
-        setShowComposer(false);
+        if (res.ethical_flag) {
+          setShowComposer(true);
+        } else {
+          setPhase({ kind: "home" });
+          setShowComposer(false);
+        }
       } catch (e) {
         pushAura(`Evaluation failed: ${(e as Error).message}`, "Error");
       } finally {
@@ -416,15 +451,26 @@ export function AICoachScreen({
           chatSessionId,
         );
         setChatSessionId(ev.session_id);
-        pushAura(formatCoachFeedback(ev.feedback), "Feedback");
-        setInterviewShowNext(true);
-        setShowComposer(false);
-        setPhase({
-          kind: "interview",
-          questionNumber: phase.questionNumber,
-          questionText: phase.questionText,
-          awaitingFeedback: false,
-        });
+        pushAura(formatCoachFeedback(ev.feedback), ev.ethical_flag ? "Ethical review" : "Feedback");
+        if (ev.ethical_flag) {
+          setInterviewShowNext(false);
+          setShowComposer(true);
+          setPhase({
+            kind: "interview",
+            questionNumber: phase.questionNumber,
+            questionText: phase.questionText,
+            awaitingFeedback: true,
+          });
+        } else {
+          setInterviewShowNext(true);
+          setShowComposer(false);
+          setPhase({
+            kind: "interview",
+            questionNumber: phase.questionNumber,
+            questionText: phase.questionText,
+            awaitingFeedback: false,
+          });
+        }
       } catch (e) {
         pushAura(`Could not evaluate: ${(e as Error).message}`, "Error");
       } finally {
@@ -445,15 +491,26 @@ export function AICoachScreen({
           chatSessionId,
         );
         setChatSessionId(ev.session_id);
-        pushAura(formatCoachFeedback(ev.feedback), "Feedback");
-        setReflectionShowNext(true);
-        setShowComposer(false);
-        setPhase({
-          kind: "reflection",
-          questionNumber: phase.questionNumber,
-          questionText: phase.questionText,
-          awaitingFeedback: false,
-        });
+        pushAura(formatCoachFeedback(ev.feedback), ev.ethical_flag ? "Ethical review" : "Feedback");
+        if (ev.ethical_flag) {
+          setReflectionShowNext(false);
+          setShowComposer(true);
+          setPhase({
+            kind: "reflection",
+            questionNumber: phase.questionNumber,
+            questionText: phase.questionText,
+            awaitingFeedback: true,
+          });
+        } else {
+          setReflectionShowNext(true);
+          setShowComposer(false);
+          setPhase({
+            kind: "reflection",
+            questionNumber: phase.questionNumber,
+            questionText: phase.questionText,
+            awaitingFeedback: false,
+          });
+        }
       } catch (e) {
         pushAura(`Could not evaluate: ${(e as Error).message}`, "Error");
       } finally {
@@ -606,18 +663,28 @@ export function AICoachScreen({
           <View style={{ flex: 1 }}>
             <ScreenHeader title="AI Coach" subtitle="Choose a path - then reply in your own words" />
           </View>
-          {phase.kind !== "home" ? (
+          <View style={styles.topBarActions}>
             <Pressable
-              onPress={resetToHome}
-              style={styles.exitPill}
-              accessibilityLabel={phase.kind === "interview" ? "Exit interview" : "Exit flow"}
+              onPress={() => void startNewChat()}
+              style={({ pressed }) => [styles.headerIconBtn, pressed && styles.headerIconBtnPressed]}
+              accessibilityLabel="Start new chat"
+              accessibilityRole="button"
             >
-              <Ionicons name="close" size={18} color={palette.text} />
-              <Text style={styles.exitPillText}>
-                {phase.kind === "interview" ? "Exit interview" : "Exit"}
-              </Text>
+              <Ionicons name="create-outline" size={20} color={colors.primary} />
             </Pressable>
-          ) : null}
+            {phase.kind !== "home" ? (
+              <Pressable
+                onPress={resetToHome}
+                style={styles.exitPill}
+                accessibilityLabel={phase.kind === "interview" ? "Exit interview" : "Exit flow"}
+              >
+                <Ionicons name="close" size={18} color={palette.text} />
+                <Text style={styles.exitPillText}>
+                  {phase.kind === "interview" ? "Exit interview" : "Exit"}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
         </View>
 
         {showPromptBand ? (
@@ -819,6 +886,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: screenPadding,
     paddingTop: 6,
     gap: 8,
+  },
+  topBarActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 8,
+  },
+  headerIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  headerIconBtnPressed: {
+    opacity: 0.75,
   },
   exitPill: {
     flexDirection: "row",
