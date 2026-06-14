@@ -12,6 +12,7 @@ from app.json_utils import (
     clean_coach_question_text,
     extract_json_object,
 )
+from app.answer_intent import is_dont_know_answer
 from app.ethical_validation import check_answer_ethics
 from app.ollama_client import structured_completion
 from app.skills_repo import skill_id, status_id_by_name, upsert_user_skill_score
@@ -40,6 +41,76 @@ BEHAVIORAL_QUESTION_FALLBACKS = [
     "Give an example where you coordinated with another team across different working styles.",
     "When have you disagreed respectfully with a lead or stakeholder? Walk through Situation → Task → Action → Result briefly.",
 ]
+
+
+_EVAL_FEEDBACK_RULES = """
+FEEDBACK RULES (IMPORTANT):
+- The user submitted a substantive attempt. Do NOT treat it as "I don't know."
+- Score 3: feedback MUST clearly say the answer is strong/good/excellent and cite specific strengths.
+- Score 2: acknowledge what is correct or useful first, then give focused improvements. Do not call detailed answers "vague."
+- Score 1: explain what is wrong or missing. Use "vague" ONLY if they gave almost no concrete detail despite attempting.
+- Never give generic vague criticism when the user provided specific examples, steps, or reasoning.
+"""
+
+
+async def _coach_dont_know_interview(question: str) -> str:
+    system = """You are a supportive behavioral interview coach."""
+    user = f"""INTERVIEW QUESTION:
+{question}
+
+The candidate honestly said they do not know how to answer (or could not answer).
+
+Write plain-text feedback (NOT JSON):
+1. One warm sentence: it is okay not to know yet — honesty is fine.
+2. A concise STAR-style model answer they can learn from (Situation, Task, Action, Result).
+3. One short tip for tackling similar questions next time.
+
+Do NOT criticize them as vague. Do NOT say they failed to provide a solution. Max 220 words."""
+
+    try:
+        raw = await structured_completion(system, user)
+        text = clean_coach_display_text(raw)
+        if text:
+            return text
+    except Exception:
+        pass
+    return (
+        "That's completely okay — not knowing yet is part of learning. "
+        "For this type of question, use STAR: describe a real Situation, your Task, "
+        "the Actions you took, and the Result with measurable impact. "
+        "Try drafting one example from school, work, or a project, even if small. "
+        "Practising aloud will make the structure feel natural next time."
+    )
+
+
+async def _coach_dont_know_task(task_description: str, skill_name: str) -> str:
+    system = """You are a supportive technical skills coach."""
+    user = f"""TASK:
+{task_description}
+
+SKILL BEING ASSESSED: {skill_name}
+
+The learner honestly said they do not know the answer.
+
+Write plain-text feedback (NOT JSON):
+1. One warm sentence: it is okay not to know yet.
+2. Explain the correct approach or model answer clearly so they can learn.
+3. One actionable study tip tied to {skill_name}.
+
+Do NOT criticize them as vague or incomplete for not knowing. Max 220 words."""
+
+    try:
+        raw = await structured_completion(system, user)
+        text = clean_coach_display_text(raw)
+        if text:
+            return text
+    except Exception:
+        pass
+    return (
+        "That's fine — it's okay not to have this ready yet. "
+        f"Review the core ideas for **{skill_name}**, then walk through the task step by step "
+        "with a simple example. Try again when ready; learning the model answer first is a good strategy."
+    )
 
 
 def fetch_user_learning_row(email: str) -> dict[str, Any]:
@@ -264,11 +335,24 @@ async def interview_evaluate(
             "ethical_flag": True,
         }
 
+    if is_dont_know_answer(user_answer):
+        feedback = await _coach_dont_know_interview(question)
+        with get_conn() as conn:
+            upsert_user_skill_score(conn, uid, INTERVIEW_SKILL, 1)
+        return {
+            "question_number": question_number,
+            "score": 1,
+            "feedback": feedback,
+            "dont_know": True,
+        }
+
     system = """You are a behavioral interview evaluator.
 
 RULES:
 - Output ONLY JSON (no markdown).
-- Assign only one score (1, 2, or 3)."""
+- Assign only one score (1, 2, or 3).
+- The user attempted a real answer."""
+    system += _EVAL_FEEDBACK_RULES
 
     user = f"""INPUTS:
 USER_ANSWER: {user_answer}
@@ -277,13 +361,13 @@ QUESTION: {question}
 SCORING RUBRIC (STAR METHOD):
 
 Score 1 (Low):
-Answer is vague, lacks structure, missing STAR elements
+Incorrect, off-topic, or almost no usable content (not an honest "I don't know").
 
 Score 2 (Moderate):
-Partial STAR structure, unclear result or impact
+Partial STAR structure with some concrete details; room to improve clarity or impact.
 
 Score 3 (Industry Ready):
-Full STAR structure with clear situation, task, action, result
+Full STAR structure with clear situation, task, action, result and strong impact.
 
 OUTPUT FORMAT:
 {{
@@ -749,6 +833,17 @@ async def evaluate_task_answer(
             "ethical_flag": True,
         }
 
+    if is_dont_know_answer(user_answer):
+        feedback = await _coach_dont_know_task(task_description, skill_name)
+        with get_conn() as conn:
+            upsert_user_skill_score(conn, uid, skill_name, 1)
+        return {
+            "skill": skill_name,
+            "score": 1,
+            "feedback_message": feedback,
+            "dont_know": True,
+        }
+
     system = """You are a technical skill evaluator for a learning system.
 
 You evaluate the user's answer to a given task based ONLY on the specified skill.
@@ -761,19 +856,22 @@ RULES
 - Do NOT ask questions.
 - Output ONLY valid JSON (no markdown fences).
 - Assign ONLY one score (1, 2, or 3).
-- Be strict and consistent.
+- The user attempted a real answer (not an honest "I don't know")."""
+    system += _EVAL_FEEDBACK_RULES
+
+    system += """
 
 --------------------------------------------------------------
 SCORING RUBRIC (ALL SKILLS)
 --------------------------------------------------------------
 Score 1 (Low):
-Incorrect or very incomplete answer. Misunderstands core concept or logic.
+Incorrect or fundamentally misunderstands the concept. Only use when they tried but were wrong.
 
 Score 2 (Moderate):
-Partially correct answer. Missing clarity, depth, or structure.
+Partially correct with useful parts; explain gaps without calling detailed work "vague."
 
 Score 3 (Industry Ready):
-Fully correct answer. Clear reasoning, structured explanation, strong understanding.
+Fully correct, clear reasoning, structured explanation — tell them the answer is good/strong.
 
 --------------------------------------------------------------
 SKILL FOCUS (use only the line that matches SKILL)
@@ -847,15 +945,16 @@ OUTPUT FORMAT (STRICT JSON ONLY)
 
     with get_conn() as conn:
         upsert_user_skill_score(conn, uid, skill_name, score)
-        try:
-            done_id = status_id_by_name(conn, "completed")
-            conn.execute(
-                """UPDATE user_common_tasks SET status_id = %s, end_date_time = COALESCE(end_date_time, NOW())
-                   WHERE id = %s AND user_id = %s""",
-                (done_id, user_common_task_id, uid),
-            )
-        except Exception:
-            pass
+        if score >= 2:
+            try:
+                done_id = status_id_by_name(conn, "completed")
+                conn.execute(
+                    """UPDATE user_common_tasks SET status_id = %s, end_date_time = COALESCE(end_date_time, NOW())
+                       WHERE id = %s AND user_id = %s""",
+                    (done_id, user_common_task_id, uid),
+                )
+            except Exception:
+                pass
 
     # Chat/UI shows feedback only per product spec; score is persisted via user_skills.
     _ = tip  # still produced by model for potential future use / logging

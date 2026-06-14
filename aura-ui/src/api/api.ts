@@ -419,6 +419,7 @@ export const api = {
       question_number: number;
       session_id: number;
       ethical_flag?: boolean;
+      dont_know?: boolean;
     }>;
   },
 
@@ -523,6 +524,7 @@ export const api = {
       question_number: number;
       session_id: number;
       ethical_flag?: boolean;
+      dont_know?: boolean;
     }>;
   },
 
@@ -560,7 +562,7 @@ export const api = {
       body: JSON.stringify(body),
     });
     if (!response.ok) throw new Error(await response.text());
-    return response.json() as Promise<{ feedback_message: string; score: number; skill: string; session_id: number; ethical_flag?: boolean }>;
+    return response.json() as Promise<{ feedback_message: string; score: number; skill: string; session_id: number; ethical_flag?: boolean; dont_know?: boolean }>;
   },
 
   async getAgentChatHistory(sessionId?: number) {
