@@ -62,5 +62,4 @@ npm run typecheck
 
 ## 8. Notes
 
-- The old Vite web source is left in the repository for reference, but the Expo app now uses `App.tsx` and `src-native/`.
-- The TypeScript config excludes the legacy `src/` folder so the Expo app can build cleanly without the old web-only files.
+- The Expo app uses `App.tsx` and the `src/` folder. All screens load live data from the Go API and Python AI agent — there is no mock data layer.
