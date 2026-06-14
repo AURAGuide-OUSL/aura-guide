@@ -5,12 +5,20 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "http://192.168.8.105:8080",
+        "EXPO_PUBLIC_AI_AGENT_BASE_URL": "http://192.168.8.105:8001"
+      }
     },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "http://192.168.8.105:8080",
+        "EXPO_PUBLIC_AI_AGENT_BASE_URL": "http://192.168.8.105:8001"
       }
     },
     "production": {}
