@@ -190,7 +190,7 @@ export function SignUpScreen({
             {draft.acceptTerms ? <Ionicons name="checkmark" size={14} color="#FFFFFF" /> : null}
           </View>
           <Text style={styles.checkboxText}>
-            I accept the Terms and Conditions (Last updated: May 2026) and Privacy Policy
+            I accept the Terms and Conditions (Last updated: June 2026) and Privacy Policy
           </Text>
         </Pressable>
 
