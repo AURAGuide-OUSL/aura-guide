@@ -9,6 +9,7 @@ import { ScreenHeader } from "../../components/ScreenHeader";
 import { SegmentedControl } from "../../components/SegmentedControl";
 import { PrimaryButton } from "../../components/PrimaryButton";
 import { InputField } from "../../components/InputField";
+import { DatePickerField, parseISODate, toISODateLocal } from "../../components/DatePickerField";
 import { api } from "../../api/api";
 import { screenStyles, useScreenScrollStyle } from "../../styles/screenStyles";
 import { useTextColors } from "../../theme/themedHelpers";
@@ -83,6 +84,20 @@ function tomorrowISO() {
   const d = new Date();
   d.setDate(d.getDate() + 1);
   return d.toISOString().slice(0, 10);
+}
+
+function dayAfterISO(iso: string): string {
+  const d = parseISODate(iso);
+  if (!d) return tomorrowISO();
+  d.setDate(d.getDate() + 1);
+  return toISODateLocal(d);
+}
+
+function handleStartDateChange(iso: string, currentEnd: string, setStart: (v: string) => void, setEnd: (v: string) => void) {
+  setStart(iso);
+  if (!currentEnd || currentEnd <= iso) {
+    setEnd(dayAfterISO(iso));
+  }
 }
 
 export function TasksScreen({
@@ -276,15 +291,19 @@ export function TasksScreen({
               />
               <View style={styles.dateInputRow}>
                 <View style={commonStyles.flexOne}>
-                  <InputField
+                  <DatePickerField
                     label="Start Date"
-                    placeholder="YYYY-MM-DD"
                     value={newStartDate}
-                    onChangeText={setNewStartDate}
+                    onChange={(iso) => handleStartDateChange(iso, newEndDate, setNewStartDate, setNewEndDate)}
                   />
                 </View>
                 <View style={commonStyles.flexOne}>
-                  <InputField label="End Date" placeholder="YYYY-MM-DD" value={newEndDate} onChangeText={setNewEndDate} />
+                  <DatePickerField
+                    label="End Date"
+                    value={newEndDate}
+                    onChange={setNewEndDate}
+                    minimumDate={newStartDate}
+                  />
                 </View>
               </View>
               <PrimaryButton label="Add Task" onPress={addTask} />
@@ -337,10 +356,21 @@ export function TasksScreen({
                   <InputField label="Task Name" placeholder="Task name" value={editTaskName} onChangeText={setEditTaskName} />
                   <View style={styles.dateInputRow}>
                     <View style={commonStyles.flexOne}>
-                      <InputField label="Start Date" placeholder="YYYY-MM-DD" value={editStartDate} onChangeText={setEditStartDate} />
+                      <DatePickerField
+                        label="Start Date"
+                        value={editStartDate}
+                        onChange={(iso) =>
+                          handleStartDateChange(iso, editEndDate, setEditStartDate, setEditEndDate)
+                        }
+                      />
                     </View>
                     <View style={commonStyles.flexOne}>
-                      <InputField label="End Date" placeholder="YYYY-MM-DD" value={editEndDate} onChangeText={setEditEndDate} />
+                      <DatePickerField
+                        label="End Date"
+                        value={editEndDate}
+                        onChange={setEditEndDate}
+                        minimumDate={editStartDate}
+                      />
                     </View>
                   </View>
                   <PrimaryButton label="Save changes" onPress={saveEditedTask} />
