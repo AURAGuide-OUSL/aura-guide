@@ -16,7 +16,12 @@ from app.agent_workflows import (
     reflection_next_question,
     run_cv_analyze,
 )
-from app.chat_persist import append_message, resolve_session_id
+from app.chat_persist import (
+    append_message,
+    fetch_all_chat_rows,
+    fetch_recent_chat_rows,
+    resolve_session_id,
+)
 from app.auth import get_current_email
 from app.db import get_conn
 from app.json_utils import clean_coach_display_text
@@ -111,13 +116,8 @@ async def agent_chat(body: ChatRequest, email: str = Depends(get_current_email))
             (session_id, text, True),
         )
 
-    history_rows = []
     with get_conn() as conn:
-        history_rows = conn.execute(
-            """SELECT message, is_sender_user FROM chat_message
-               WHERE session_id = %s ORDER BY id ASC""",
-            (session_id,),
-        ).fetchall()
+        history_rows = fetch_recent_chat_rows(conn, session_id)
 
     ollama_messages: list[dict] = []
     for row in history_rows:
@@ -134,8 +134,10 @@ async def agent_chat(body: ChatRequest, email: str = Depends(get_current_email))
                 f"soft={row['soft_skill_level']}"
             )
             if is_communication_exit_message(text):
+                with get_conn() as conn:
+                    full_history_rows = fetch_all_chat_rows(conn, session_id)
                 lines: list[str] = []
-                for r in history_rows:
+                for r in full_history_rows:
                     role = "User" if r["is_sender_user"] else "Coach"
                     lines.append(f"{role}: {r['message']}")
                 hist_txt = "\n".join(lines)

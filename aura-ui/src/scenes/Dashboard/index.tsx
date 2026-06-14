@@ -285,7 +285,7 @@ export function DashboardScreen({
 
       <View style={styles.sectionHeadingRow}>
         <Text style={[styles.sectionTitle, tc.text]}>Ongoing Tasks</Text>
-        <TextLink label="View all" onPress={() => onNavigate("tasks")} />
+        <TextLink label="View all" onPress={() => goTab("tasks")} />
       </View>
 
       {tasks.length === 0 ? (

@@ -5,6 +5,26 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 
+CHAT_OLLAMA_HISTORY_LIMIT = 20
+
+
+def fetch_recent_chat_rows(conn, session_id: int, limit: int = CHAT_OLLAMA_HISTORY_LIMIT):
+    rows = conn.execute(
+        """SELECT message, is_sender_user FROM chat_message
+           WHERE session_id = %s ORDER BY id DESC LIMIT %s""",
+        (session_id, limit),
+    ).fetchall()
+    return list(reversed(rows))
+
+
+def fetch_all_chat_rows(conn, session_id: int):
+    return conn.execute(
+        """SELECT message, is_sender_user FROM chat_message
+           WHERE session_id = %s ORDER BY id ASC""",
+        (session_id,),
+    ).fetchall()
+
+
 def append_message(conn, session_id: int, message: str, is_sender_user: bool) -> None:
     text = (message or "").strip()
     if not text:
